@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>memguardian</AssemblyName>
+    <RootNamespace>MemGuardian.Next.Cli</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MemGuardian.Next.Core\MemGuardian.Next.Core.csproj" />
+    <ProjectReference Include="..\MemGuardian.Next.Windows\MemGuardian.Next.Windows.csproj" />
+  </ItemGroup>
+</Project>

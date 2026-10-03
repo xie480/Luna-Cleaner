@@ -1,0 +1,36 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MemGuardian.Next.Core", "src\MemGuardian.Next.Core\MemGuardian.Next.Core.csproj", "{6E4DF4D8-A775-40CD-8E53-5229A0DCA801}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MemGuardian.Next.Windows", "src\MemGuardian.Next.Windows\MemGuardian.Next.Windows.csproj", "{DA9CC510-414A-40D8-8C44-3203EE6F5D3D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MemGuardian.Next.Cli", "src\MemGuardian.Next.Cli\MemGuardian.Next.Cli.csproj", "{6A972C6A-A4BF-4240-B811-31F89A73E4A3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MemGuardian.Next.Tests", "tests\MemGuardian.Next.Tests\MemGuardian.Next.Tests.csproj", "{795E99C8-FB7C-440D-9A25-8D21B2554C6A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{6E4DF4D8-A775-40CD-8E53-5229A0DCA801}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6E4DF4D8-A775-40CD-8E53-5229A0DCA801}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6E4DF4D8-A775-40CD-8E53-5229A0DCA801}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6E4DF4D8-A775-40CD-8E53-5229A0DCA801}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DA9CC510-414A-40D8-8C44-3203EE6F5D3D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DA9CC510-414A-40D8-8C44-3203EE6F5D3D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DA9CC510-414A-40D8-8C44-3203EE6F5D3D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DA9CC510-414A-40D8-8C44-3203EE6F5D3D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6A972C6A-A4BF-4240-B811-31F89A73E4A3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6A972C6A-A4BF-4240-B811-31F89A73E4A3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6A972C6A-A4BF-4240-B811-31F89A73E4A3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6A972C6A-A4BF-4240-B811-31F89A73E4A3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{795E99C8-FB7C-440D-9A25-8D21B2554C6A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{795E99C8-FB7C-440D-9A25-8D21B2554C6A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{795E99C8-FB7C-440D-9A25-8D21B2554C6A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{795E99C8-FB7C-440D-9A25-8D21B2554C6A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

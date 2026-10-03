@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>MemGuardian.Next.Windows</AssemblyName>
+    <RootNamespace>MemGuardian.Next.Windows</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MemGuardian.Next.Core\MemGuardian.Next.Core.csproj" />
+  </ItemGroup>
+</Project>

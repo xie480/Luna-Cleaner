@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>MemGuardian.Next.Core</AssemblyName>
+    <RootNamespace>MemGuardian.Next.Core</RootNamespace>
+  </PropertyGroup>
+</Project>
