@@ -5,7 +5,8 @@ public sealed class ReclaimCandidateSelector
 {
     /// <summary>选择一轮最多两个可安全尝试的 Working Set 候选。</summary>
     public CandidateSelection Select(IReadOnlyList<ProcessSnapshot> processes, ControllerState state,
-        ReclaimState reclaimState, GuardianOptions options, DateTimeOffset now)
+        ReclaimState reclaimState, GuardianOptions options, DateTimeOffset now,
+        ReclaimTrigger trigger = ReclaimTrigger.Automatic)
     {
         ArgumentNullException.ThrowIfNull(processes);
         ArgumentNullException.ThrowIfNull(reclaimState);
@@ -27,7 +28,7 @@ public sealed class ReclaimCandidateSelector
         var rejected = new List<CandidateRejection>();
         foreach (var process in processes.OrderByDescending(value => value.WorkingSetBytes))
         {
-            var reason = RejectionReason(process, reclaimState, options, now);
+            var reason = RejectionReason(process, reclaimState, options, now, trigger);
             if (reason is not null)
             {
                 rejected.Add(new CandidateRejection(process.Identity, process.ProcessName, reason));
@@ -42,7 +43,7 @@ public sealed class ReclaimCandidateSelector
     }
 
     private static string? RejectionReason(ProcessSnapshot process, ReclaimState state, GuardianOptions options,
-        DateTimeOffset now)
+        DateTimeOffset now, ReclaimTrigger trigger)
     {
         if (process.Identity.ProcessId <= 0) return "Invalid or system PID";
         if (options.Denylist.Contains(process.ProcessName)) return "Denylist";
@@ -51,10 +52,16 @@ public sealed class ReclaimCandidateSelector
         if (!process.CanTrim) return process.CollectionError ?? "Trim access unavailable";
         if (process.IsForeground) return "Foreground process";
         if (process.Identity.ProcessId == Environment.ProcessId) return "MemGuardian.Next process";
-        if (process.LastUsedAt is null) return "Foreground-use history unknown";
-        var idle = now - process.LastUsedAt.Value;
-        if (idle < options.RecentUseProtection) return "Used within the protected interval";
-        if (idle < options.MinimumIdleTime) return "Not idle long enough";
+        if (process.LastUsedAt is { } lastUsedAt)
+        {
+            var idle = now - lastUsedAt;
+            if (idle < options.RecentUseProtection) return "Used within the protected interval";
+            if (idle < options.MinimumIdleTime) return "Not idle long enough";
+        }
+        else if (trigger != ReclaimTrigger.Manual)
+        {
+            return "Foreground-use history unknown";
+        }
         if (process.WorkingSetBytes < options.MinimumCandidateWorkingSetBytes) return "Working Set below minimum";
         if (process.CpuPercent is null || process.CpuPercent > options.MaximumCandidateCpuPercent) return "CPU activity is high or unknown";
         if (process.IoBytesPerSecond is null || process.IoBytesPerSecond > options.MaximumCandidateIoBytesPerSecond)
@@ -195,7 +202,7 @@ public sealed class AdaptiveReclaimCoordinator
     /// <summary>dry-run 仅返回候选；执行模式最多处理所选进程并等待反馈采样。</summary>
     public async Task<ReclaimRoundResult> ExecuteAsync(SystemSnapshot before, CandidateSelection selection,
         ControllerState state, ReclaimState reclaimState, bool dryRun, GuardianOptions options,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, ReclaimTrigger trigger = ReclaimTrigger.Automatic)
     {
         ArgumentNullException.ThrowIfNull(before);
         ArgumentNullException.ThrowIfNull(selection);
@@ -221,7 +228,7 @@ public sealed class AdaptiveReclaimCoordinator
             }
 
             var revalidated = _candidateSelector.Select(new[] { currentTarget }, state, currentState, options,
-                currentSnapshot.Memory.CapturedAt);
+                currentSnapshot.Memory.CapturedAt, trigger);
             if (revalidated.Candidates.Count == 0)
             {
                 attempts.Add(new ReclaimAttempt(target.Identity, target.ProcessName, false,

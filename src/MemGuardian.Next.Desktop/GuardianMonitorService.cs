@@ -140,7 +140,8 @@ public sealed class GuardianMonitorService : IAsyncDisposable
                     stateMachine.ConfirmedLevel);
                 var state = stateMachine.Observe(diagnosis.Level, now, _store.Options, _store.State);
                 _store.UpdateState(stateMachine.ExportState(_store.State), now);
-                var selection = _selector.Select(snapshot.Processes, state, _store.State, _store.Options, now);
+                var trigger = manualPending ? ReclaimTrigger.Manual : ReclaimTrigger.Automatic;
+                var selection = _selector.Select(snapshot.Processes, state, _store.State, _store.Options, now, trigger);
                 ReclaimRoundResult? round = null;
                 TaskCompletionSource<string>? manualRequest;
                 bool automaticRound;
@@ -155,6 +156,7 @@ public sealed class GuardianMonitorService : IAsyncDisposable
                     _reclaimInProgress = !deferManualUntilFreshProcessSample && (manualRequest is not null || automaticRound);
                 }
 
+                var reclaimTrigger = manualRequest is null ? ReclaimTrigger.Automatic : ReclaimTrigger.Manual;
                 string? manualMessage = null;
                 try
                 {
@@ -177,9 +179,9 @@ public sealed class GuardianMonitorService : IAsyncDisposable
                     else if (automaticRound || manualRequest is not null)
                     {
                         round = await coordinator.ExecuteAsync(snapshot, selection, state, _store.State,
-                            dryRun: false, _store.Options, cancellationToken).ConfigureAwait(false);
-                        var trigger = manualRequest is null ? ReclaimTrigger.Automatic : ReclaimTrigger.Manual;
-                        RecordRound(round, trigger);
+                            dryRun: false, _store.Options, cancellationToken,
+                            trigger: reclaimTrigger).ConfigureAwait(false);
+                        RecordRound(round, reclaimTrigger);
                         if (manualRequest is not null)
                             manualMessage = FormatManualResult(_store.RecentReclaimLogs.TakeLast(round.Attempts.Count).ToArray());
                     }

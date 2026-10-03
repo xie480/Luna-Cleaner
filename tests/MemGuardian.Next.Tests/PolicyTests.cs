@@ -24,6 +24,45 @@ public sealed class PolicyTests
         Assert.Contains(recentResult.Rejections, rejected => rejected.Reason == "Used within the protected interval");
     }
 
+    /// <summary>手动请求可覆盖未知使用历史，但不覆盖前台保护或已知的近期使用保护。</summary>
+    [Fact]
+    public void ManualSelectionAllowsUnknownHistoryButPreservesOtherProtections()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var selector = new ReclaimCandidateSelector();
+        var unknownHistory = Candidate(2202, now) with { LastUsedAt = null };
+
+        var automatic = selector.Select(new[] { unknownHistory }, ControllerState.Pressure,
+            new ReclaimState(), new GuardianOptions(), now);
+        var manual = selector.Select(new[] { unknownHistory }, ControllerState.Pressure,
+            new ReclaimState(), new GuardianOptions(), now, ReclaimTrigger.Manual);
+        var foreground = selector.Select(new[] { unknownHistory with { IsForeground = true } }, ControllerState.Pressure,
+            new ReclaimState(), new GuardianOptions(), now, ReclaimTrigger.Manual);
+        var knownRecent = selector.Select(new[]
+        {
+            Candidate(2203, now, lastUsed: now - TimeSpan.FromSeconds(30))
+        }, ControllerState.Pressure, new ReclaimState(), new GuardianOptions(), now, ReclaimTrigger.Manual);
+        var knownNotIdle = selector.Select(new[]
+        {
+            Candidate(2204, now, lastUsed: now - TimeSpan.FromMinutes(5))
+        }, ControllerState.Pressure, new ReclaimState(), new GuardianOptions(), now, ReclaimTrigger.Manual);
+        var cooldown = selector.Select(new[] { unknownHistory }, ControllerState.Pressure,
+            new ReclaimState { GlobalCooldownUntil = now + TimeSpan.FromMinutes(1) },
+            new GuardianOptions(), now, ReclaimTrigger.Manual);
+
+        Assert.Empty(automatic.Candidates);
+        Assert.Contains(automatic.Rejections, rejected => rejected.Reason == "Foreground-use history unknown");
+        Assert.Single(manual.Candidates);
+        Assert.Empty(foreground.Candidates);
+        Assert.Contains(foreground.Rejections, rejected => rejected.Reason == "Foreground process");
+        Assert.Empty(knownRecent.Candidates);
+        Assert.Contains(knownRecent.Rejections, rejected => rejected.Reason == "Used within the protected interval");
+        Assert.Empty(knownNotIdle.Candidates);
+        Assert.Contains(knownNotIdle.Rejections, rejected => rejected.Reason == "Not idle long enough");
+        Assert.Empty(cooldown.Candidates);
+        Assert.Equal("Global cooldown active", cooldown.BlockedBy);
+    }
+
     /// <summary>全局 cooldown 与进程 cooldown 都会阻止真实候选。</summary>
     [Fact]
     public void GlobalAndPerProcessCooldownAreEnforced()
@@ -169,6 +208,36 @@ public sealed class PolicyTests
         Assert.Contains("Foreground", result.Attempts[0].Error);
         Assert.Equal(0, reclaimer.Calls);
         Assert.Empty(result.Feedbacks);
+    }
+
+    /// <summary>手动允许未知历史的候选在真正调用 API 前二次校验时仍沿用该权限。</summary>
+    [Fact]
+    public async Task ManualUnknownHistoryCandidateSurvivesExecutionRevalidation()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var candidate = Candidate(2511, now) with { LastUsedAt = null };
+        var before = Snapshot(now, new[] { candidate });
+        var selector = new ReclaimCandidateSelector();
+        var selection = selector.Select(before.Processes, ControllerState.Pressure,
+            new ReclaimState(), new GuardianOptions(), now, ReclaimTrigger.Manual);
+        var revalidated = Snapshot(now + TimeSpan.FromSeconds(1), new[] { candidate });
+        var afterTrim = Snapshot(now + TimeSpan.FromSeconds(2), new[]
+        {
+            candidate with { WorkingSetBytes = 100 * MiB }
+        }, available: 4.5);
+        var reclaimer = new FakeReclaimer();
+        var sampler = new FakeSnapshotProvider(revalidated, afterTrim);
+        var coordinator = new AdaptiveReclaimCoordinator(reclaimer, sampler, new ReclaimFeedbackEvaluator(), selector);
+
+        var result = await coordinator.ExecuteAsync(before, selection, ControllerState.Pressure,
+            new ReclaimState(), dryRun: false, new GuardianOptions { FeedbackDelay = TimeSpan.Zero },
+            trigger: ReclaimTrigger.Manual);
+
+        Assert.Single(result.Attempts);
+        Assert.True(result.Attempts[0].Succeeded);
+        Assert.True(result.Attempts[0].NativeCallAttempted);
+        Assert.Equal(1, reclaimer.Calls);
+        Assert.Equal(2, sampler.Calls);
     }
 
     /// <summary>单进程 Working Set 下降但 Commit 持平时反馈只称为 resident pages reclaimed。</summary>
