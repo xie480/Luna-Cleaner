@@ -5,19 +5,20 @@
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="MemGuardian.Next" Width="1380" Height="900" MinWidth="1120" MinHeight="740"
         WindowStyle="None" ResizeMode="CanResize" Background="{StaticResource Canvas}"
-        UseLayoutRounding="True" SnapsToDevicePixels="True">
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
+        SourceInitialized="WindowSourceInitialized" StateChanged="WindowStateChanged">
   <shell:WindowChrome.WindowChrome>
     <shell:WindowChrome CaptionHeight="54" ResizeBorderThickness="6" CornerRadius="12" GlassFrameThickness="0" UseAeroCaptionButtons="False" />
   </shell:WindowChrome.WindowChrome>
-  <Border Background="{StaticResource Canvas}" CornerRadius="12" BorderBrush="#DDE5EF" BorderThickness="1">
+  <Border x:Name="WindowSurface" Background="{StaticResource Canvas}" CornerRadius="12" BorderBrush="#20364B" BorderThickness="1">
     <Grid>
       <Grid.RowDefinitions><RowDefinition Height="54"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-      <Border Grid.Row="0" Background="#FFFFFF" CornerRadius="12,12,0,0" BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1">
+      <Border Grid.Row="0" Background="#0B1726" CornerRadius="12,12,0,0" BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1">
         <Grid Margin="22,0,12,0">
           <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
           <StackPanel Orientation="Horizontal" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
-            <Border Width="30" Height="30" CornerRadius="9" Background="#EAF1FF" Margin="0,0,10,0">
-              <TextBlock Text="M" Foreground="{StaticResource Accent}" FontSize="17" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <Border Width="30" Height="30" CornerRadius="9" Background="{StaticResource AccentSoft}" Margin="0,0,10,0">
+            <TextBlock Text="M" Foreground="{StaticResource Accent}" FontSize="17" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
             <StackPanel VerticalAlignment="Center">
               <TextBlock Text="MEMGUARDIAN.NEXT" FontSize="12" FontWeight="Bold" />
@@ -26,7 +27,7 @@
           </StackPanel>
           <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
             <Ellipse x:Name="HeaderStateDot" Width="7" Height="7" Fill="{StaticResource Success}" Margin="0,0,7,0" />
-            <TextBlock x:Name="HeaderStateText" Text="正在连接" FontSize="11" Foreground="#5E6B7C" />
+            <TextBlock x:Name="HeaderStateText" Text="正在连接" FontSize="11" Foreground="{StaticResource Muted}" />
           </StackPanel>
           <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" shell:WindowChrome.IsHitTestVisibleInChrome="True">
             <Button Style="{StaticResource WindowButton}" Content="—" Click="MinimizeClick" />
@@ -42,23 +43,23 @@
             <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="18"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
             <StackPanel>
               <TextBlock Text="工作台" Foreground="#FFFFFF" FontSize="13" FontWeight="SemiBold" Margin="12,0,0,8" />
-              <Button x:Name="DashboardNav" Style="{StaticResource NavButton}" Click="DashboardNavClick" Background="#263C52" Foreground="White">
-                <StackPanel Orientation="Horizontal"><TextBlock Text="◫" FontSize="17" Width="28"/><TextBlock Text="系统态势" VerticalAlignment="Center"/></StackPanel>
+              <Button x:Name="DashboardNav" Style="{StaticResource NavButton}" Click="DashboardNavClick" Background="#123344" Foreground="White" Tag="selected">
+                <StackPanel Orientation="Horizontal"><TextBlock Text="◫" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}" FontSize="17" Width="28"/><TextBlock Text="系统态势" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}" VerticalAlignment="Center"/></StackPanel>
               </Button>
-              <Button Style="{StaticResource NavButton}" Click="ProcessesNavClick">
-                <StackPanel Orientation="Horizontal"><TextBlock Text="▤" FontSize="17" Width="28"/><TextBlock Text="进程观察" VerticalAlignment="Center"/></StackPanel>
+              <Button x:Name="ProcessesNav" Style="{StaticResource NavButton}" Click="ProcessesNavClick">
+                <StackPanel Orientation="Horizontal"><TextBlock Text="▤" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}" FontSize="17" Width="28"/><TextBlock Text="进程观察" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}" VerticalAlignment="Center"/></StackPanel>
               </Button>
-              <Button Style="{StaticResource NavButton}" Click="DiagnosticsNavClick">
-                <StackPanel Orientation="Horizontal"><TextBlock Text="⌁" FontSize="19" Width="28"/><TextBlock Text="诊断证据" VerticalAlignment="Center"/></StackPanel>
+              <Button x:Name="DiagnosticsNav" Style="{StaticResource NavButton}" Click="DiagnosticsNavClick">
+                <StackPanel Orientation="Horizontal"><TextBlock Text="⌁" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}" FontSize="19" Width="28"/><TextBlock Text="诊断证据" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}" VerticalAlignment="Center"/></StackPanel>
               </Button>
             </StackPanel>
             <StackPanel Grid.Row="2" Margin="0,18,0,0">
               <TextBlock Text="偏好设置" Foreground="#FFFFFF" FontSize="13" FontWeight="SemiBold" Margin="12,0,0,8" />
-              <Button Style="{StaticResource NavButton}" Click="SettingsNavClick">
-                <StackPanel Orientation="Horizontal"><TextBlock Text="⚙" FontSize="16" Width="28"/><TextBlock Text="策略与启动" VerticalAlignment="Center"/></StackPanel>
+              <Button x:Name="SettingsNav" Style="{StaticResource NavButton}" Click="SettingsNavClick">
+                <StackPanel Orientation="Horizontal"><TextBlock Text="⚙" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}" FontSize="16" Width="28"/><TextBlock Text="策略与启动" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}" VerticalAlignment="Center"/></StackPanel>
               </Button>
             </StackPanel>
-            <Border Grid.Row="4" Background="#203247" CornerRadius="11" Padding="14">
+            <Border Grid.Row="4" Background="#101F30" BorderBrush="#20384D" BorderThickness="1" CornerRadius="11" Padding="14">
               <StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,7">
                   <Ellipse x:Name="SidebarStateDot" Width="7" Height="7" Fill="{StaticResource Success}" Margin="0,0,7,0" VerticalAlignment="Center" />
@@ -84,7 +85,7 @@
                 </StackPanel>
               </Grid>
               <UniformGrid Columns="4" Margin="0,0,0,16">
-                <Border Background="White" CornerRadius="12" Padding="17" Margin="0,0,12,0" BorderBrush="{StaticResource Line}" BorderThickness="1">
+                <Border Background="{StaticResource Card}" CornerRadius="12" Padding="17" Margin="0,0,12,0" BorderBrush="{StaticResource Line}" BorderThickness="1">
                   <StackPanel>
                     <TextBlock Text="物理内存 / 可用" Style="{StaticResource BodyText}" />
                     <TextBlock x:Name="PhysicalValue" Text="—" FontSize="22" FontWeight="Bold" Margin="0,9,0,2" />
@@ -92,7 +93,7 @@
                   <local:Sparkline x:Name="AvailableTrend" Height="35" Margin="0,8,0,0" Stroke="#3378F6" FixedRatioScale="True" />
                   </StackPanel>
                 </Border>
-                <Border Background="White" CornerRadius="12" Padding="17" Margin="0,0,12,0" BorderBrush="{StaticResource Line}" BorderThickness="1">
+                <Border Background="{StaticResource Card}" CornerRadius="12" Padding="17" Margin="0,0,12,0" BorderBrush="{StaticResource Line}" BorderThickness="1">
                   <StackPanel>
                     <TextBlock Text="系统 Commit" Style="{StaticResource BodyText}" />
                     <TextBlock x:Name="CommitValue" Text="—" FontSize="22" FontWeight="Bold" Margin="0,9,0,2" />
@@ -100,15 +101,15 @@
                     <local:Sparkline x:Name="CommitTrend" Height="35" Margin="0,8,0,0" Stroke="#8C6CF2" FixedRatioScale="True" />
                   </StackPanel>
                 </Border>
-                <Border Background="White" CornerRadius="12" Padding="17" Margin="0,0,12,0" BorderBrush="{StaticResource Line}" BorderThickness="1">
+                <Border Background="{StaticResource Card}" CornerRadius="12" Padding="17" Margin="0,0,12,0" BorderBrush="{StaticResource Line}" BorderThickness="1">
                   <StackPanel>
                     <TextBlock Text="页面读取速率" Style="{StaticResource BodyText}" />
                     <TextBlock x:Name="PagingValue" Text="—" FontSize="22" FontWeight="Bold" Margin="0,9,0,2" />
                     <TextBlock x:Name="PagingDetail" Text="Page Reads/sec · Pages Input/sec" FontSize="11" Foreground="{StaticResource Muted}" />
-                    <local:Sparkline x:Name="PagingTrend" Height="35" Margin="0,8,0,0" Stroke="#E5A03B" />
+                    <local:Sparkline x:Name="PagingTrend" Height="35" Margin="0,8,0,0" Stroke="#FFB85E" />
                   </StackPanel>
                 </Border>
-                <Border Background="White" CornerRadius="12" Padding="17" BorderBrush="{StaticResource Line}" BorderThickness="1">
+                <Border Background="{StaticResource Card}" CornerRadius="12" Padding="17" BorderBrush="{StaticResource Line}" BorderThickness="1">
                   <StackPanel>
                     <TextBlock Text="内核池 / 页面文件" Style="{StaticResource BodyText}" />
                     <TextBlock x:Name="PoolValue" Text="—" FontSize="22" FontWeight="Bold" Margin="0,9,0,2" />
@@ -119,7 +120,7 @@
               </UniformGrid>
               <Grid Margin="0,0,0,16">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="1.4*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                <Border Grid.Column="0" Background="White" CornerRadius="12" Padding="20" Margin="0,0,12,0" BorderBrush="{StaticResource Line}" BorderThickness="1">
+                <Border Grid.Column="0" Background="{StaticResource Card}" CornerRadius="12" Padding="20" Margin="0,0,12,0" BorderBrush="{StaticResource Line}" BorderThickness="1">
                   <StackPanel>
                     <Grid Margin="0,0,0,11">
                       <StackPanel><TextBlock Text="内存趋势" FontSize="15" FontWeight="SemiBold"/><TextBlock Text="最近 15 分钟 · 有界本地采样" Style="{StaticResource BodyText}" Margin="0,4,0,0"/></StackPanel>
@@ -135,22 +136,22 @@
                     <TextBlock x:Name="TrendRangeText" Text="等待积累趋势数据" Style="{StaticResource BodyText}" FontSize="10" Margin="0,8,0,0" />
                   </StackPanel>
                 </Border>
-                <Border Grid.Column="1" Background="White" CornerRadius="12" Padding="20" BorderBrush="{StaticResource Line}" BorderThickness="1">
+                <Border Grid.Column="1" Background="{StaticResource Card}" CornerRadius="12" Padding="20" BorderBrush="{StaticResource Line}" BorderThickness="1">
                   <StackPanel>
                     <TextBlock Text="诊断结论" FontSize="15" FontWeight="SemiBold" />
                     <TextBlock x:Name="DiagnosisLevelText" Text="等待系统采样" FontSize="22" FontWeight="Bold" Margin="0,14,0,3" />
                     <TextBlock x:Name="DiagnosisSummaryText" Text="压力判断会结合 Available、Commit、paging 与内核池。" Style="{StaticResource BodyText}" TextWrapping="Wrap" />
                     <ItemsControl x:Name="DiagnosisChips" Margin="0,12,0,0">
                       <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                      <ItemsControl.ItemTemplate><DataTemplate><Border Background="#EDF3FF" CornerRadius="7" Padding="8,5" Margin="0,0,6,6"><TextBlock Text="{Binding}" FontSize="10" Foreground="#4168A5" /></Border></DataTemplate></ItemsControl.ItemTemplate>
+                      <ItemsControl.ItemTemplate><DataTemplate><Border Background="#172A3D" CornerRadius="7" Padding="8,5" Margin="0,0,6,6"><TextBlock Text="{Binding}" FontSize="10" Foreground="#8DD8FF" /></Border></DataTemplate></ItemsControl.ItemTemplate>
                     </ItemsControl>
                     <TextBlock x:Name="AutoPolicyText" Text="自动回收关闭 · 仅监测" FontSize="11" Foreground="{StaticResource Muted}" Margin="0,5,0,0" />
                     <TextBlock Text="最近一次回收反馈" FontSize="10" Foreground="#8793A1" Margin="0,12,0,3" />
-                    <TextBlock x:Name="LastFeedbackText" Text="尚无回收记录" FontSize="10" Foreground="#526173" TextWrapping="Wrap" MaxHeight="70" />
+                    <TextBlock x:Name="LastFeedbackText" Text="尚无回收记录" FontSize="10" Foreground="{StaticResource Muted}" TextWrapping="Wrap" MaxHeight="70" />
                   </StackPanel>
                 </Border>
               </Grid>
-              <Border Background="White" CornerRadius="12" Padding="20" BorderBrush="{StaticResource Line}" BorderThickness="1">
+              <Border Background="{StaticResource Card}" CornerRadius="12" Padding="20" BorderBrush="{StaticResource Line}" BorderThickness="1">
                 <StackPanel>
                   <Grid Margin="0,0,0,13"><TextBlock Text="后台进程概览" FontSize="15" FontWeight="SemiBold"/><Button Content="查看全部" Style="{StaticResource SecondaryButton}" Padding="12,6" HorizontalAlignment="Right" Click="ProcessesNavClick" /></Grid>
                   <Grid Margin="0,0,0,7">
@@ -159,10 +160,10 @@
                   </Grid>
                   <ItemsControl x:Name="DashboardProcesses" ItemsSource="{Binding ProcessRows}">
                     <ItemsControl.ItemTemplate><DataTemplate>
-                      <Border BorderBrush="#EEF1F5" BorderThickness="0,1,0,0" Padding="0,11">
+                      <Border BorderBrush="#23394F" BorderThickness="0,1,0,0" Padding="0,11">
                         <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="2.2*"/><ColumnDefinition Width=".6*"/><ColumnDefinition Width=".8*"/><ColumnDefinition Width=".8*"/><ColumnDefinition Width=".6*"/></Grid.ColumnDefinitions>
-                          <StackPanel Orientation="Horizontal"><Border Width="30" Height="30" Background="#EDF3FF" CornerRadius="8" Margin="0,0,9,0"><TextBlock Text="{Binding Initial}" Foreground="#4C75C8" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><StackPanel VerticalAlignment="Center"><TextBlock Text="{Binding ProcessName}" FontSize="12" FontWeight="SemiBold"/><TextBlock Text="{Binding Details}" FontSize="10" Foreground="{StaticResource Muted}" Margin="0,2,0,0"/></StackPanel></StackPanel>
-                          <TextBlock Grid.Column="1" Text="{Binding Cpu}" FontSize="11" Foreground="#526173" HorizontalAlignment="Right" VerticalAlignment="Center"/><TextBlock Grid.Column="2" Text="{Binding WorkingSet}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center"/><TextBlock Grid.Column="3" Text="{Binding PrivateCommit}" FontSize="11" HorizontalAlignment="Right" VerticalAlignment="Center"/><TextBlock Grid.Column="4" Text="{Binding Activity}" FontSize="10" Foreground="{Binding ActivityBrush}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                          <StackPanel Orientation="Horizontal"><Border Width="30" Height="30" Background="#172A3D" CornerRadius="8" Margin="0,0,9,0"><TextBlock Text="{Binding Initial}" Foreground="#8DD8FF" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border><StackPanel VerticalAlignment="Center"><TextBlock Text="{Binding ProcessName}" FontSize="12" FontWeight="SemiBold"/><TextBlock Text="{Binding Details}" FontSize="10" Foreground="{StaticResource Muted}" Margin="0,2,0,0"/></StackPanel></StackPanel>
+                          <TextBlock Grid.Column="1" Text="{Binding Cpu}" FontSize="11" Foreground="{StaticResource Muted}" HorizontalAlignment="Right" VerticalAlignment="Center"/><TextBlock Grid.Column="2" Text="{Binding WorkingSet}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center"/><TextBlock Grid.Column="3" Text="{Binding PrivateCommit}" FontSize="11" HorizontalAlignment="Right" VerticalAlignment="Center"/><TextBlock Grid.Column="4" Text="{Binding Activity}" FontSize="10" Foreground="{Binding ActivityBrush}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                         </Grid>
                       </Border>
                     </DataTemplate></ItemsControl.ItemTemplate>
@@ -170,7 +171,7 @@
                   <TextBlock x:Name="EmptyProcessesText" Text="正在读取进程指标；Access Denied 或已退出的进程会被安全跳过。" Style="{StaticResource BodyText}" Margin="0,14,0,2" />
                 </StackPanel>
               </Border>
-              <TextBlock x:Name="CounterWarningText" Text="" Foreground="#B77A20" FontSize="10" TextWrapping="Wrap" Margin="2,12,0,0" />
+              <TextBlock x:Name="CounterWarningText" Text="" Foreground="#FFBF69" FontSize="10" TextWrapping="Wrap" Margin="2,12,0,0" />
             </StackPanel>
           </ScrollViewer>
           <ScrollViewer x:Name="ProcessesPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -182,7 +183,7 @@
                   <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="2.1*"/><ColumnDefinition Width=".45*"/><ColumnDefinition Width=".7*"/><ColumnDefinition Width=".75*"/><ColumnDefinition Width=".55*"/><ColumnDefinition Width=".55*"/><ColumnDefinition Width=".7*"/><ColumnDefinition Width=".8*"/></Grid.ColumnDefinitions><TextBlock Text="进程 / 用户与最近使用" Style="{StaticResource BodyText}" FontSize="10"/><TextBlock Grid.Column="1" Text="CPU" Style="{StaticResource BodyText}" FontSize="10" HorizontalAlignment="Right"/><TextBlock Grid.Column="2" Text="I/O" Style="{StaticResource BodyText}" FontSize="10" HorizontalAlignment="Right"/><TextBlock Grid.Column="3" Text="Working Set" Style="{StaticResource BodyText}" FontSize="10" HorizontalAlignment="Right"/><TextBlock Grid.Column="4" Text="Private Commit" Style="{StaticResource BodyText}" FontSize="10" HorizontalAlignment="Right"/><TextBlock Grid.Column="5" Text="线程" Style="{StaticResource BodyText}" FontSize="10" HorizontalAlignment="Right"/><TextBlock Grid.Column="6" Text="句柄" Style="{StaticResource BodyText}" FontSize="10" HorizontalAlignment="Right"/><TextBlock Grid.Column="7" Text="活动" Style="{StaticResource BodyText}" FontSize="10" HorizontalAlignment="Right"/></Grid>
                   <ItemsControl x:Name="AllProcesses" ItemsSource="{Binding ProcessRows}">
                     <ItemsControl.ItemTemplate><DataTemplate>
-                      <Border BorderBrush="#EEF1F5" BorderThickness="0,1,0,0" Padding="0,12">
+                      <Border BorderBrush="#23394F" BorderThickness="0,1,0,0" Padding="0,12">
                         <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="2.1*"/><ColumnDefinition Width=".45*"/><ColumnDefinition Width=".7*"/><ColumnDefinition Width=".75*"/><ColumnDefinition Width=".55*"/><ColumnDefinition Width=".55*"/><ColumnDefinition Width=".7*"/><ColumnDefinition Width=".8*"/></Grid.ColumnDefinitions>
                           <StackPanel><TextBlock Text="{Binding ProcessName}" FontSize="12" FontWeight="SemiBold"/><TextBlock Text="{Binding Details}" FontSize="10" Foreground="{StaticResource Muted}" Margin="0,3,0,0"/></StackPanel>
                           <TextBlock Grid.Column="1" Text="{Binding Cpu}" FontSize="11" HorizontalAlignment="Right" VerticalAlignment="Center"/><TextBlock Grid.Column="2" Text="{Binding Io}" FontSize="11" HorizontalAlignment="Right" VerticalAlignment="Center"/><TextBlock Grid.Column="3" Text="{Binding WorkingSet}" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center"/><TextBlock Grid.Column="4" Text="{Binding PrivateCommit}" FontSize="11" HorizontalAlignment="Right" VerticalAlignment="Center"/><TextBlock Grid.Column="5" Text="{Binding Threads}" FontSize="11" HorizontalAlignment="Right" VerticalAlignment="Center"/><TextBlock Grid.Column="6" Text="{Binding Handles}" FontSize="11" HorizontalAlignment="Right" VerticalAlignment="Center"/><TextBlock Grid.Column="7" Text="{Binding Activity}" FontSize="10" Foreground="{Binding ActivityBrush}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
@@ -197,8 +198,8 @@
           <ScrollViewer x:Name="DiagnosticsPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel Margin="30,28,30,34">
               <TextBlock Text="诊断证据" FontSize="25" FontWeight="Bold"/><TextBlock Text="状态机使用持续时间确认、恢复迟滞和 paging 趋势，避免单次尖峰触发动作。" Style="{StaticResource BodyText}" Margin="0,5,0,20" />
-              <Border Background="White" CornerRadius="12" Padding="22" BorderBrush="{StaticResource Line}" BorderThickness="1">
-                <StackPanel><TextBlock x:Name="EvidenceLevelText" Text="等待采样" FontSize="21" FontWeight="Bold"/><TextBlock x:Name="EvidenceStateText" Text="" Style="{StaticResource BodyText}" Margin="0,4,0,14"/><ItemsControl x:Name="EvidenceItems"><ItemsControl.ItemTemplate><DataTemplate><Border Background="#F7F9FC" CornerRadius="9" Padding="13" Margin="0,0,0,8"><StackPanel Orientation="Horizontal"><Ellipse Width="7" Height="7" Fill="{StaticResource Accent}" Margin="0,0,10,0" VerticalAlignment="Center"/><TextBlock Text="{Binding}" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center"/></StackPanel></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl><TextBlock x:Name="NoEvidenceText" Text="目前没有达到告警阈值的诊断项。" Style="{StaticResource BodyText}"/></StackPanel>
+              <Border Background="{StaticResource Card}" CornerRadius="12" Padding="22" BorderBrush="{StaticResource Line}" BorderThickness="1">
+                <StackPanel><TextBlock x:Name="EvidenceLevelText" Text="等待采样" FontSize="21" FontWeight="Bold"/><TextBlock x:Name="EvidenceStateText" Text="" Style="{StaticResource BodyText}" Margin="0,4,0,14"/><ItemsControl x:Name="EvidenceItems"><ItemsControl.ItemTemplate><DataTemplate><Border Background="#0D1A2A" CornerRadius="9" Padding="13" Margin="0,0,0,8"><StackPanel Orientation="Horizontal"><Ellipse Width="7" Height="7" Fill="{StaticResource Accent}" Margin="0,0,10,0" VerticalAlignment="Center"/><TextBlock Text="{Binding}" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center"/></StackPanel></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl><TextBlock x:Name="NoEvidenceText" Text="目前没有达到告警阈值的诊断项。" Style="{StaticResource BodyText}"/></StackPanel>
               </Border>
               <Border Background="#EAF1FF" CornerRadius="12" Padding="18" Margin="0,16,0,0"><StackPanel><TextBlock Text="指标解释" FontSize="14" FontWeight="SemiBold" Foreground="#355C9A"/><TextBlock Text="Working Set 表示当前驻留物理页；Private Commit 表示进程私有提交量。EmptyWorkingSet 只能驱逐驻留页，通常不会降低 Commit。Available RAM 增量与页面读取反馈会共同决定策略评分。" TextWrapping="Wrap" FontSize="12" Foreground="#536D96" Margin="0,8,0,0" /></StackPanel></Border>
             </StackPanel>
@@ -206,7 +207,7 @@
           <ScrollViewer x:Name="SettingsPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel Margin="30,28,30,34">
               <Grid Margin="0,0,0,20"><StackPanel><TextBlock Text="策略与启动" FontSize="25" FontWeight="Bold"/><TextBlock Text="阈值会经过安全边界校验；实时运行只在压力确认后尝试回收。" Style="{StaticResource BodyText}" Margin="0,5,0,0"/></StackPanel><StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center"><Button Style="{StaticResource SecondaryButton}" Content="一键配置开机启动" Margin="0,0,8,0" Click="ToggleStartupClick"/><Button Style="{StaticResource PrimaryButton}" Content="保存设置" Click="SaveSettingsClick"/></StackPanel></Grid>
-              <Border Background="White" CornerRadius="12" Padding="20" BorderBrush="{StaticResource Line}" BorderThickness="1" Margin="0,0,0,14">
+              <Border Background="{StaticResource Card}" CornerRadius="12" Padding="20" BorderBrush="{StaticResource Line}" BorderThickness="1" Margin="0,0,0,14">
                 <StackPanel><TextBlock Text="运行方式" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,14"/>
                   <CheckBox x:Name="MonitorToggle" Style="{StaticResource CustomCheckBox}" Content="启动时开始监控" FontSize="12" Margin="0,0,0,13"/>
                   <CheckBox x:Name="AutoReclaimToggle" Style="{StaticResource CustomCheckBox}" Content="启用自动 Working Set 回收" FontSize="12" Margin="0,0,0,13"/>

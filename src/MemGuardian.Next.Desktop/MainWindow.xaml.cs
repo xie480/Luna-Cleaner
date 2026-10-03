@@ -1,9 +1,12 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Security;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Forms = System.Windows.Forms;
@@ -13,6 +16,7 @@ using MediaBrushes = System.Windows.Media.Brushes;
 using MediaColor = System.Windows.Media.Color;
 using MemGuardian.Next.Core;
 using MemGuardian.Next.Windows;
+using WpfButton = System.Windows.Controls.Button;
 
 namespace MemGuardian.Next.Desktop;
 
@@ -31,6 +35,11 @@ public partial class MainWindow : Window
     private GuardianMonitorService? _monitor;
     private DesktopPreferences _preferences;
     private DispatcherTimer? _toastTimer;
+    private DispatcherTimer? _refreshTimeoutTimer;
+    private HwndSource? _windowSource;
+    private WpfButton? _refreshButton;
+    private object? _refreshButtonOriginalContent;
+    private bool _refreshPending;
     private bool _explicitExit;
     private bool _awaitingShutdown;
 
@@ -98,6 +107,9 @@ public partial class MainWindow : Window
 
     private void WindowClosed(object? sender, EventArgs e)
     {
+        CompleteRefreshFeedback();
+        _windowSource?.RemoveHook(WindowMessageHook);
+        _windowSource = null;
         _trayIcon.Visible = false;
         _trayIcon.Dispose();
         _trayDrawingIcon.Dispose();
@@ -121,16 +133,78 @@ public partial class MainWindow : Window
         ProcessesPage.Visibility = page == "processes" ? Visibility.Visible : Visibility.Collapsed;
         DiagnosticsPage.Visibility = page == "diagnostics" ? Visibility.Visible : Visibility.Collapsed;
         SettingsPage.Visibility = page == "settings" ? Visibility.Visible : Visibility.Collapsed;
-        DashboardNav.Background = page == "dashboard" ? new SolidColorBrush(MediaColor.FromRgb(38, 60, 82)) : MediaBrushes.Transparent;
-        DashboardNav.Foreground = page == "dashboard" ? MediaBrushes.White : new SolidColorBrush(MediaColor.FromRgb(168, 182, 198));
+        SetNavigationVisual(DashboardNav, page == "dashboard");
+        SetNavigationVisual(ProcessesNav, page == "processes");
+        SetNavigationVisual(DiagnosticsNav, page == "diagnostics");
+        SetNavigationVisual(SettingsNav, page == "settings");
         if (page == "settings") LoadSettingsIntoControls();
+    }
+
+    private static void SetNavigationVisual(WpfButton button, bool selected)
+    {
+        button.Tag = selected ? "selected" : null;
+        button.Background = selected
+            ? new SolidColorBrush(MediaColor.FromRgb(18, 51, 68))
+            : MediaBrushes.Transparent;
+        button.Foreground = selected
+            ? MediaBrushes.White
+            : new SolidColorBrush(MediaColor.FromRgb(169, 188, 208));
     }
 
     private void RefreshClick(object sender, RoutedEventArgs e)
     {
-        _monitor?.RequestRefresh();
-        ShowToast(_monitor is null ? "请先在设置中启用监控。" : "已安排立即采样。等待系统指标更新…");
+        var monitor = _monitor;
+        if (monitor is null)
+        {
+            ShowToast("请先在策略与启动中启用监控。");
+            return;
+        }
+
+        if (_refreshPending) return;
+
+        _refreshPending = true;
+        _refreshButton = sender as WpfButton;
+        _refreshButtonOriginalContent = _refreshButton?.Content;
+        if (_refreshButton is not null)
+        {
+            _refreshButton.IsEnabled = false;
+            _refreshButton.Content = "采样中…";
+        }
+
+        DashboardSubtitle.Text = "正在刷新系统与进程指标…";
+        ShowToast("采样请求已提交，正在更新指标…");
+        try
+        {
+            monitor.RequestRefresh();
+            _refreshTimeoutTimer ??= new DispatcherTimer { Interval = TimeSpan.FromSeconds(30) };
+            _refreshTimeoutTimer.Tick -= RefreshTimeoutTick;
+            _refreshTimeoutTimer.Tick += RefreshTimeoutTick;
+            _refreshTimeoutTimer.Start();
+        }
+        catch (InvalidOperationException exception)
+        {
+            CompleteRefreshFeedback($"立即采样失败：{exception.Message}");
+        }
     }
+
+    private void CompleteRefreshFeedback(string? message = null)
+    {
+        if (!_refreshPending) return;
+
+        _refreshPending = false;
+        _refreshTimeoutTimer?.Stop();
+        if (_refreshButton is not null)
+        {
+            _refreshButton.Content = _refreshButtonOriginalContent;
+            _refreshButton.IsEnabled = true;
+        }
+        _refreshButton = null;
+        _refreshButtonOriginalContent = null;
+        if (message is not null) ShowToast(message);
+    }
+
+    private void RefreshTimeoutTick(object? sender, EventArgs e) =>
+        CompleteRefreshFeedback("等待系统采样响应超时；监控仍会按计划继续运行。");
 
     private void MinimizeClick(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
 
@@ -138,6 +212,90 @@ public partial class MainWindow : Window
     {
         WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
         MaximizeButton.Content = WindowState == WindowState.Maximized ? "❐" : "□";
+    }
+
+    private void WindowSourceInitialized(object? sender, EventArgs e)
+    {
+        _windowSource = PresentationSource.FromVisual(this) as HwndSource;
+        _windowSource?.AddHook(WindowMessageHook);
+    }
+
+    private void WindowStateChanged(object? sender, EventArgs e)
+    {
+        var maximized = WindowState == WindowState.Maximized;
+        WindowSurface.CornerRadius = maximized ? new CornerRadius(0) : new CornerRadius(12);
+        MaximizeButton.Content = maximized ? "❐" : "□";
+    }
+
+    private static IntPtr WindowMessageHook(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (message != WmGetMinMaxInfo || lParam == IntPtr.Zero) return IntPtr.Zero;
+
+        var monitor = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
+        if (monitor == IntPtr.Zero) return IntPtr.Zero;
+
+        var monitorInfo = new NativeMonitorInfo { Size = Marshal.SizeOf<NativeMonitorInfo>() };
+        if (!GetMonitorInfo(monitor, ref monitorInfo)) return IntPtr.Zero;
+
+        var minMaxInfo = Marshal.PtrToStructure<NativeMinMaxInfo>(lParam);
+        minMaxInfo.MaxPosition = new NativePoint
+        {
+            X = monitorInfo.Work.Left - monitorInfo.Monitor.Left,
+            Y = monitorInfo.Work.Top - monitorInfo.Monitor.Top
+        };
+        minMaxInfo.MaxSize = new NativePoint
+        {
+            X = monitorInfo.Work.Right - monitorInfo.Work.Left,
+            Y = monitorInfo.Work.Bottom - monitorInfo.Work.Top
+        };
+        Marshal.StructureToPtr(minMaxInfo, lParam, false);
+        handled = true;
+        return IntPtr.Zero;
+    }
+
+    private const int WmGetMinMaxInfo = 0x0024;
+    private const uint MonitorDefaultToNearest = 0x00000002;
+
+    [DllImport("user32.dll", ExactSpelling = true)]
+    private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+
+    [DllImport("user32.dll", EntryPoint = "GetMonitorInfoW", ExactSpelling = true, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetMonitorInfo(IntPtr monitor, ref NativeMonitorInfo monitorInfo);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X;
+        public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeMinMaxInfo
+    {
+        public NativePoint Reserved;
+        public NativePoint MaxSize;
+        public NativePoint MaxPosition;
+        public NativePoint MinTrackSize;
+        public NativePoint MaxTrackSize;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeMonitorInfo
+    {
+        public int Size;
+        public NativeRect Monitor;
+        public NativeRect Work;
+        public uint Flags;
     }
 
     private void CloseClick(object sender, RoutedEventArgs e) => Close();
@@ -155,8 +313,17 @@ public partial class MainWindow : Window
         Close();
     }
 
-    private void ToggleStartupClick(object sender, RoutedEventArgs e)
+    private async void ToggleStartupClick(object sender, RoutedEventArgs e)
     {
+        var button = sender as WpfButton;
+        var originalContent = button?.Content;
+        if (button is not null)
+        {
+            button.IsEnabled = false;
+            button.Content = "正在配置…";
+            await Task.Yield();
+        }
+
         try
         {
             var enable = StartupToggle.IsChecked != true;
@@ -173,10 +340,28 @@ public partial class MainWindow : Window
         {
             ShowToast($"开机启动配置失败：{exception.Message}");
         }
+        finally
+        {
+            if (button is not null)
+            {
+                button.Content = originalContent;
+                button.IsEnabled = true;
+            }
+        }
     }
 
     private async void SaveSettingsClick(object sender, RoutedEventArgs e)
     {
+        var button = sender as WpfButton;
+        var originalContent = button?.Content;
+        if (button is not null)
+        {
+            button.IsEnabled = false;
+            button.Content = "保存中…";
+            SettingsFeedbackText.Text = "正在校验并应用设置…";
+            await Task.Yield();
+        }
+
         try
         {
             var options = ReadOptionsFromControls();
@@ -206,6 +391,14 @@ public partial class MainWindow : Window
         {
             SettingsFeedbackText.Text = $"设置未能应用：{exception.Message}";
             ShowToast(SettingsFeedbackText.Text);
+        }
+        finally
+        {
+            if (button is not null)
+            {
+                button.Content = originalContent;
+                button.IsEnabled = true;
+            }
         }
     }
 
@@ -237,6 +430,7 @@ public partial class MainWindow : Window
 
     private async Task StopMonitoringAsync()
     {
+        CompleteRefreshFeedback();
         var monitor = _monitor;
         if (monitor is null) return;
         _monitor = null;
@@ -254,6 +448,7 @@ public partial class MainWindow : Window
         if (update.Snapshot is null || update.Diagnosis is null)
         {
             DashboardSubtitle.Text = update.Message ?? "等待首轮系统采样。";
+            CompleteRefreshFeedback(update.Message ?? "采样已完成，但指标尚不完整。");
             return;
         }
 
@@ -300,6 +495,7 @@ public partial class MainWindow : Window
             ? "PDH paging 计数器暂不可用；系统内存与 Commit 指标仍可用于诊断。"
             : string.Empty;
         SidebarUpdateText.Text = update.UpdatedAt.ToLocalTime().ToString("HH:mm:ss 更新 · 15 分钟有界趋势", CultureInfo.CurrentCulture);
+        CompleteRefreshFeedback("采样完成，页面指标已更新。");
     }
 
     private ProcessRow ToRow(ProcessSnapshot process, CandidateSelection? selection)
