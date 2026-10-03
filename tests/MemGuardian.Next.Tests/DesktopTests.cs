@@ -137,4 +137,94 @@ public sealed class DesktopTests
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
     }
+
+    [Fact]
+    public void ReclaimLogBuilder_SeparatesNativeCallsSkipsAndResidentOnlyFeedback()
+    {
+        const ulong mib = 1024 * 1024;
+        var now = DateTimeOffset.UtcNow;
+        var identity = new ProcessIdentity(1234, 5678);
+        var before = new SystemMemoryMetrics(now, 8 * 1024 * mib, 512 * mib, 2048 * mib, 8 * 1024 * mib,
+            512 * mib, 128 * mib, 256 * mib, 1, 20, 30, 4096 * mib);
+        var after = before with
+        {
+            CapturedAt = now + TimeSpan.FromSeconds(5),
+            AvailablePhysicalBytes = 768 * mib
+        };
+        var feedback = new ReclaimFeedbackEvaluator().Evaluate(before, after, 768 * mib, 256 * mib,
+            new GuardianOptions()) with
+        {
+            CapturedAt = after.CapturedAt,
+            TargetIdentity = identity,
+            TargetProcessName = "SampleApp"
+        };
+        var round = new ReclaimRoundResult(new CandidateSelection(Array.Empty<ProcessSnapshot>(),
+            Array.Empty<CandidateRejection>(), null), new[]
+        {
+            new ReclaimAttempt(identity, "SampleApp", true, null) { NativeCallAttempted = true },
+            new ReclaimAttempt(new ProcessIdentity(1235, 5679), "DeniedApp", false, "Access denied") { NativeCallAttempted = true },
+            new ReclaimAttempt(new ProcessIdentity(1236, 5680), "ExitedApp", false, "Process exited")
+        }, new[] { feedback }, false);
+
+        var entries = ReclaimLogBuilder.FromRound(round, ReclaimTrigger.Manual, now);
+
+        Assert.Equal(3, entries.Count);
+        Assert.Equal(ReclaimTrigger.Manual, entries[0].Trigger);
+        Assert.Equal(ReclaimLogStatus.Succeeded, entries[0].Status);
+        Assert.Equal(512 * mib, entries[0].WorkingSetReclaimedBytes);
+        Assert.Equal(0, entries[0].CommitDeltaBytes);
+        Assert.True(entries[0].ResidentPagesOnly);
+        Assert.Contains("不代表释放了同等大小的 Commit", entries[0].Summary);
+        Assert.Equal(ReclaimLogStatus.Failed, entries[1].Status);
+        Assert.Equal(ReclaimLogStatus.Skipped, entries[2].Status);
+    }
+
+    [Fact]
+    public void RuntimeStore_PersistsOnlyMostRecent128ReclaimLogEntries()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "MemGuardian.Next.Tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var store = new LocalRuntimeStore(root);
+            var now = DateTimeOffset.UtcNow;
+            for (var index = 0; index < 140; index++)
+            {
+                store.RecordReclaimLog(ReclaimLogBuilder.Skipped(index % 2 == 0 ? ReclaimTrigger.Manual : ReclaimTrigger.Automatic,
+                    now.AddSeconds(index), $"entry-{index}"));
+            }
+
+            Assert.Null(store.Save());
+            var restored = new LocalRuntimeStore(root);
+
+            Assert.Equal(128, restored.RecentReclaimLogs.Count);
+            Assert.Equal("entry-12", restored.RecentReclaimLogs[0].Summary);
+            Assert.Equal("entry-139", restored.RecentReclaimLogs[^1].Summary);
+            Assert.Equal(ReclaimTrigger.Automatic, restored.RecentReclaimLogs[^1].Trigger);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void RuntimeStore_LoadsVersionTwoStateWithoutReclaimLogs()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "MemGuardian.Next.Tests", Guid.NewGuid().ToString("N"));
+        var directory = Path.Combine(root, "MemGuardian.Next");
+        try
+        {
+            Directory.CreateDirectory(directory);
+            File.WriteAllText(Path.Combine(directory, "state.json"), "{\"Version\":2,\"State\":{},\"History\":[],\"FeedbackHistory\":[]}");
+
+            var store = new LocalRuntimeStore(root);
+
+            Assert.Empty(store.RecentReclaimLogs);
+            Assert.Empty(store.Warnings);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
 }

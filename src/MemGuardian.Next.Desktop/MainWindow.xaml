@@ -52,6 +52,9 @@
               <Button x:Name="DiagnosticsNav" Style="{StaticResource NavButton}" Click="DiagnosticsNavClick">
                 <StackPanel Orientation="Horizontal"><TextBlock Text="⌁" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}" FontSize="19" Width="28"/><TextBlock Text="诊断证据" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}" VerticalAlignment="Center"/></StackPanel>
               </Button>
+              <Button x:Name="ReclaimLogNav" Style="{StaticResource NavButton}" Click="ReclaimLogNavClick">
+                <StackPanel Orientation="Horizontal"><TextBlock Text="◷" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}" FontSize="17" Width="28"/><TextBlock Text="清理日志" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType={x:Type Button}}}" VerticalAlignment="Center"/></StackPanel>
+              </Button>
             </StackPanel>
             <StackPanel Grid.Row="2" Margin="0,18,0,0">
               <TextBlock Text="偏好设置" Foreground="#FFFFFF" FontSize="13" FontWeight="SemiBold" Margin="12,0,0,8" />
@@ -81,7 +84,8 @@
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                   <Button Style="{StaticResource SecondaryButton}" Content="立即采样" Click="RefreshClick" Margin="0,0,9,0" />
-                  <Button Style="{StaticResource PrimaryButton}" Content="打开策略" Click="SettingsNavClick" />
+                  <Button x:Name="DashboardManualCleanupButton" Style="{StaticResource PrimaryButton}" Content="立即清理" Click="ManualCleanupClick" Margin="0,0,9,0" />
+                  <Button Style="{StaticResource SecondaryButton}" Content="打开策略" Click="SettingsNavClick" />
                 </StackPanel>
               </Grid>
               <UniformGrid Columns="4" Margin="0,0,0,16">
@@ -176,8 +180,8 @@
           </ScrollViewer>
           <ScrollViewer x:Name="ProcessesPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel Margin="30,28,30,34">
-              <TextBlock Text="进程观察" FontSize="25" FontWeight="Bold"/><TextBlock Text="分别查看 Working Set 与 Private Commit；两者含义不同。" Style="{StaticResource BodyText}" Margin="0,5,0,20" />
-              <Border Background="White" CornerRadius="12" Padding="20" BorderBrush="{StaticResource Line}" BorderThickness="1">
+              <Grid Margin="0,0,0,20"><StackPanel><TextBlock Text="进程观察" FontSize="25" FontWeight="Bold"/><TextBlock Text="分别查看 Working Set 与 Private Commit；立即清理只处理压力已确认且通过保护检查的候选。" Style="{StaticResource BodyText}" Margin="0,5,0,0" /></StackPanel><Button x:Name="ProcessesManualCleanupButton" Style="{StaticResource PrimaryButton}" Content="立即清理" HorizontalAlignment="Right" VerticalAlignment="Center" Click="ManualCleanupClick" /></Grid>
+              <Border Background="{StaticResource Card}" CornerRadius="12" Padding="20" BorderBrush="{StaticResource Line}" BorderThickness="1">
                 <StackPanel>
                   <Grid Margin="0,0,0,12"><TextBlock x:Name="ProcessCountText" Text="系统进程快照" FontSize="15" FontWeight="SemiBold"/><TextBlock Text="每 15 秒刷新一次进程 CPU / I/O 速率" Style="{StaticResource BodyText}" HorizontalAlignment="Right" VerticalAlignment="Center"/></Grid>
                   <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="2.1*"/><ColumnDefinition Width=".45*"/><ColumnDefinition Width=".7*"/><ColumnDefinition Width=".75*"/><ColumnDefinition Width=".55*"/><ColumnDefinition Width=".55*"/><ColumnDefinition Width=".7*"/><ColumnDefinition Width=".8*"/></Grid.ColumnDefinitions><TextBlock Text="进程 / 用户与最近使用" Style="{StaticResource BodyText}" FontSize="10"/><TextBlock Grid.Column="1" Text="CPU" Style="{StaticResource BodyText}" FontSize="10" HorizontalAlignment="Right"/><TextBlock Grid.Column="2" Text="I/O" Style="{StaticResource BodyText}" FontSize="10" HorizontalAlignment="Right"/><TextBlock Grid.Column="3" Text="Working Set" Style="{StaticResource BodyText}" FontSize="10" HorizontalAlignment="Right"/><TextBlock Grid.Column="4" Text="Private Commit" Style="{StaticResource BodyText}" FontSize="10" HorizontalAlignment="Right"/><TextBlock Grid.Column="5" Text="线程" Style="{StaticResource BodyText}" FontSize="10" HorizontalAlignment="Right"/><TextBlock Grid.Column="6" Text="句柄" Style="{StaticResource BodyText}" FontSize="10" HorizontalAlignment="Right"/><TextBlock Grid.Column="7" Text="活动" Style="{StaticResource BodyText}" FontSize="10" HorizontalAlignment="Right"/></Grid>
@@ -201,7 +205,7 @@
               <Border Background="{StaticResource Card}" CornerRadius="12" Padding="22" BorderBrush="{StaticResource Line}" BorderThickness="1">
                 <StackPanel><TextBlock x:Name="EvidenceLevelText" Text="等待采样" FontSize="21" FontWeight="Bold"/><TextBlock x:Name="EvidenceStateText" Text="" Style="{StaticResource BodyText}" Margin="0,4,0,14"/><ItemsControl x:Name="EvidenceItems"><ItemsControl.ItemTemplate><DataTemplate><Border Background="#0D1A2A" CornerRadius="9" Padding="13" Margin="0,0,0,8"><StackPanel Orientation="Horizontal"><Ellipse Width="7" Height="7" Fill="{StaticResource Accent}" Margin="0,0,10,0" VerticalAlignment="Center"/><TextBlock Text="{Binding}" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center"/></StackPanel></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl><TextBlock x:Name="NoEvidenceText" Text="目前没有达到告警阈值的诊断项。" Style="{StaticResource BodyText}"/></StackPanel>
               </Border>
-              <Border Background="#EAF1FF" CornerRadius="12" Padding="18" Margin="0,16,0,0"><StackPanel><TextBlock Text="指标解释" FontSize="14" FontWeight="SemiBold" Foreground="#355C9A"/><TextBlock Text="Working Set 表示当前驻留物理页；Private Commit 表示进程私有提交量。EmptyWorkingSet 只能驱逐驻留页，通常不会降低 Commit。Available RAM 增量与页面读取反馈会共同决定策略评分。" TextWrapping="Wrap" FontSize="12" Foreground="#536D96" Margin="0,8,0,0" /></StackPanel></Border>
+              <Border Background="{StaticResource Card}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,16,0,0"><StackPanel><TextBlock Text="指标解释" FontSize="14" FontWeight="SemiBold"/><TextBlock Text="Working Set 表示当前驻留物理页；Private Commit 表示进程私有提交量。EmptyWorkingSet 只能驱逐驻留页，通常不会降低 Commit。Available RAM 增量与页面读取反馈会共同决定策略评分。" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource Muted}" Margin="0,8,0,0" /></StackPanel></Border>
             </StackPanel>
           </ScrollViewer>
           <ScrollViewer x:Name="SettingsPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -217,7 +221,7 @@
                   <TextBlock Text="自动回收默认关闭；开启后仍受压力确认、前台保护、最近使用保护、冷却与 paging 反馈约束。" Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="53,9,0,0"/>
                 </StackPanel>
               </Border>
-              <Border Background="White" CornerRadius="12" Padding="20" BorderBrush="{StaticResource Line}" BorderThickness="1" Margin="0,0,0,14">
+              <Border Background="{StaticResource Card}" CornerRadius="12" Padding="20" BorderBrush="{StaticResource Line}" BorderThickness="1" Margin="0,0,0,14">
                 <StackPanel><TextBlock Text="压力与采样" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,5"/><TextBlock Text="比率用百分数填写；配置会限制在保守区间内。" Style="{StaticResource BodyText}" Margin="0,0,0,12"/>
                   <UniformGrid Columns="3">
                     <local:SettingField x:Name="AvailablePressureField" Label="Available 压力阈值" Unit="%"/>
@@ -233,7 +237,7 @@
                   </UniformGrid>
                 </StackPanel>
               </Border>
-              <Border Background="White" CornerRadius="12" Padding="20" BorderBrush="{StaticResource Line}" BorderThickness="1" Margin="0,0,0,14">
+              <Border Background="{StaticResource Card}" CornerRadius="12" Padding="20" BorderBrush="{StaticResource Line}" BorderThickness="1" Margin="0,0,0,14">
                 <StackPanel><TextBlock Text="回收保护与自适应" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,12"/><UniformGrid Columns="3">
                   <local:SettingField x:Name="GlobalCooldownField" Label="全局冷却" Unit="分钟"/>
                   <local:SettingField x:Name="ProcessCooldownField" Label="进程冷却" Unit="分钟"/>
@@ -249,14 +253,42 @@
                   <TextBlock Text="最近使用保护至少 120 秒；每轮最多处理 2 个进程。安全下限不能在界面中降低。" Style="{StaticResource BodyText}" Margin="0,9,0,0"/>
                 </StackPanel>
               </Border>
-              <Border Background="White" CornerRadius="12" Padding="20" BorderBrush="{StaticResource Line}" BorderThickness="1">
+              <Border Background="{StaticResource Card}" CornerRadius="12" Padding="20" BorderBrush="{StaticResource Line}" BorderThickness="1">
                 <StackPanel><TextBlock Text="进程 denylist" FontSize="15" FontWeight="SemiBold"/><TextBlock Text="每行一个进程名；关键系统进程与 MemGuardian 自身始终强制保护。" Style="{StaticResource BodyText}" Margin="0,5,0,10"/><TextBox x:Name="DenylistText" Style="{StaticResource FieldBox}" AcceptsReturn="True" Height="112" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap"/></StackPanel>
               </Border>
               <TextBlock x:Name="SettingsFeedbackText" Text="" Style="{StaticResource BodyText}" Margin="4,10,0,0"/>
             </StackPanel>
           </ScrollViewer>
+          <ScrollViewer x:Name="ReclaimLogPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="30,28,30,34">
+              <Grid Margin="0,0,0,20"><StackPanel><TextBlock Text="清理日志" FontSize="25" FontWeight="Bold"/><TextBlock Text="记录手动与自动回收的时间、驻留页变化、Available RAM、Commit 与 paging 反馈。" Style="{StaticResource BodyText}" Margin="0,5,0,0"/></StackPanel><TextBlock x:Name="ReclaimLogCountText" Text="保留最近 128 条" Style="{StaticResource BodyText}" HorizontalAlignment="Right" VerticalAlignment="Center"/></Grid>
+              <Border Background="{StaticResource Card}" CornerRadius="12" Padding="20" BorderBrush="{StaticResource Line}" BorderThickness="1">
+                <StackPanel>
+                  <Grid Margin="0,0,0,12"><Grid.ColumnDefinitions><ColumnDefinition Width="1.5*"/><ColumnDefinition Width=".55*"/><ColumnDefinition Width=".8*"/><ColumnDefinition Width=".8*"/><ColumnDefinition Width=".8*"/><ColumnDefinition Width=".55*"/></Grid.ColumnDefinitions><TextBlock Text="时间 / 目标" Style="{StaticResource BodyText}" FontSize="10"/><TextBlock Grid.Column="1" Text="触发方式" Style="{StaticResource BodyText}" FontSize="10" HorizontalAlignment="Right"/><TextBlock Grid.Column="2" Text="驻留页变化" Style="{StaticResource BodyText}" FontSize="10" HorizontalAlignment="Right"/><TextBlock Grid.Column="3" Text="Available RAM" Style="{StaticResource BodyText}" FontSize="10" HorizontalAlignment="Right"/><TextBlock Grid.Column="4" Text="Commit" Style="{StaticResource BodyText}" FontSize="10" HorizontalAlignment="Right"/><TextBlock Grid.Column="5" Text="结果" Style="{StaticResource BodyText}" FontSize="10" HorizontalAlignment="Right"/></Grid>
+                  <ItemsControl x:Name="ReclaimLogItems" ItemsSource="{Binding ReclaimLogRows}">
+                    <ItemsControl.ItemTemplate><DataTemplate>
+                      <Border Background="#0D1A2A" BorderBrush="#23394F" BorderThickness="1" CornerRadius="9" Padding="12" Margin="0,0,0,8">
+                        <StackPanel>
+                          <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="1.5*"/><ColumnDefinition Width=".55*"/><ColumnDefinition Width=".8*"/><ColumnDefinition Width=".8*"/><ColumnDefinition Width=".8*"/><ColumnDefinition Width=".55*"/></Grid.ColumnDefinitions>
+                            <StackPanel><TextBlock Text="{Binding Target}" FontSize="12" FontWeight="SemiBold"/><TextBlock Text="{Binding Timestamp}" FontSize="10" Foreground="{StaticResource Muted}" Margin="0,3,0,0"/></StackPanel>
+                            <TextBlock Grid.Column="1" Text="{Binding Trigger}" FontSize="11" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2" Text="{Binding WorkingSetReclaimed}" FontSize="11" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="3" Text="{Binding AvailableDelta}" FontSize="11" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="4" Text="{Binding CommitDelta}" FontSize="11" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="5" Text="{Binding Status}" Foreground="{Binding StatusBrush}" FontSize="11" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                          </Grid>
+                          <TextBlock Text="{Binding Summary}" TextWrapping="Wrap" TextTrimming="None" Foreground="{StaticResource Muted}" FontSize="10" Margin="0,8,0,0"/>
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate></ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock x:Name="ReclaimLogEmptyText" Text="暂时没有清理记录。立即清理会先检查压力状态、冷却与进程保护；不符合条件时会记为安全跳过。" Style="{StaticResource BodyText}" TextWrapping="Wrap" Margin="0,12,0,4"/>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </ScrollViewer>
           <Border x:Name="ToastBorder" Background="#203247" CornerRadius="10" Padding="15,10" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,26,0" Visibility="Collapsed" Panel.ZIndex="4">
-            <TextBlock x:Name="ToastText" Text="" Foreground="White" FontSize="12"/>
+            <TextBlock x:Name="ToastText" Text="" Foreground="White" FontSize="12" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxWidth="560"/>
           </Border>
         </Grid>
       </Grid>

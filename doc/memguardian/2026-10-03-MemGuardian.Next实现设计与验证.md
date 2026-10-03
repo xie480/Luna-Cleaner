@@ -128,7 +128,7 @@ flowchart LR
 - 自动监控默认开启，自动回收默认关闭。关闭窗口仅在用户启用“后台运行”时转入托盘；托盘双击恢复，窗口“退出应用”会停止采样、保存状态并释放互斥锁。
 - 一键开机启动只操作当前用户 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\MemGuardian.Next` 项，不创建计划任务或服务，不申请管理员权限。启动命令含可执行文件绝对路径，用户可选登录后最小化到托盘。
 - 桌面监控和会写状态的 CLI 命令共用独占锁；进程采样默认 15 秒，系统样本默认 5 秒，避免高频全量进程轮询。趋势 ring buffer 固定容量，页面只显示最近 15 分钟。
-- 每次真实 trim 的回收前后 Available RAM、目标 Working Set、系统 Commit、Page Reads/sec、Pages Input/sec 和目标进程身份都会写入状态文件；只保留最近 32 条，旧版 state schema 1 可继续读取并在下一次保存时升级。
+- 每次真实 trim 的回收前后 Available RAM、目标 Working Set、系统 Commit、Page Reads/sec、Pages Input/sec 和目标进程身份写入反馈历史（最近 32 条）；独立审计日志保存最近 128 条手动/自动尝试。旧版 state schema 1、2 可读取并在下一次保存时升级。
 
 ### 10.3 安全策略与未验证项
 
@@ -165,3 +165,46 @@ flowchart LR
 - 普通 `dotnet build -c Release` 在解决方案 Restore 阶段失败，日志显示 `_FilterRestoreGraphProjectInputItems` 任务失败但没有 MSBuild 错误详情。使用 `-m:1` 继续后定位并修复上述两个 WPF 编译错误。
 - 最终 `dotnet build -c Release -m:1 -v:minimal` 成功，0 警告、0 错误；`dotnet test -c Release -m:1 -v:minimal` 成功，25/25 通过。`git diff --check` 返回成功，只有 Git 的 LF/CRLF 行尾提示。
 - 构建已编译 WPF XAML 和代码；尚未在真实桌面窗口中手动核验多显示器/DPI 最大化、导航视觉、刷新超时、保存及开机启动交互，也未测量真实负载下的卡顿和分页影响。
+
+## 13. 暗色界面细化、手动回收与审计日志
+
+### 背景与目标
+
+进程观察页与策略页的白色面板在深色主题中造成强烈跳变，也让浅色文字失去对比；趋势图的亮色参考线抢过数据曲线。用户还需要可以手动发起一次安全回收，并查阅每次操作的方式、时间、效果和结果。
+
+### 方案与安全边界
+
+- 进程观察、策略表单和指标解释卡片改用统一的深色 `Card` 画刷；自绘趋势图将网格减为两条低透明度深色线，保留数据曲线作为视觉焦点。
+- 仪表盘和进程观察页增加“立即清理”。请求排入 `GuardianMonitorService` 单一监控线程，与采样/自动策略串行执行；手动请求会强制刷新进程快照，若赶在旧快照采集中则等待下一轮。手动触发只忽略“自动回收开关关闭”这一限制，仍要求状态机确认 Pressure / Critical，并复用 `ReclaimCandidateSelector` 的全局冷却、Backoff、当前用户与 Session、前台/近期使用、空闲、CPU、I/O、进程冷却和 denylist 检查。单轮上限仍为两个目标。
+- 处理期间两个入口禁用并显示“安全检查中…”，完成后展示 8 秒反馈。未确认压力或无安全候选时不会执行 trim，但会留下“已跳过”日志及原因。
+- 新增 `ReclaimLogEntry`，按每个目标记录手动/自动触发、时间、API 调用状态、Working Set 驻留页变化、Available RAM 与系统 Commit 的有符号变化，以及 Page Reads/sec、Pages Input/sec 是否恶化。摘要明确指出 Working Set 下降而 Commit 基本不变时只回收了 resident pages，不等于释放相同大小的 Commit；结果标签显示“API 成功”而不将 API 调用成功误作有效内存释放。
+- 本地 `state.json` 升至 schema 3，独立保留最近 128 条审计记录；读取兼容 schema 1、2。既有测量反馈仍单独保留最近 32 条。日志不联网、不遥测。
+
+### 核心调用链
+
+```mermaid
+sequenceDiagram
+  participant UI as WPF 界面
+  participant Monitor as GuardianMonitorService
+  participant Selector as ReclaimCandidateSelector
+  participant Coordinator as AdaptiveReclaimCoordinator
+  participant Store as LocalRuntimeStore
+  UI->>Monitor: 手动回收请求
+  Monitor->>Monitor: 新采样并确认状态
+  Monitor->>Selector: 使用当前状态与候选规则
+  alt Pressure/Critical 且有安全候选
+    Selector-->>Monitor: 最多两个候选
+    Monitor->>Coordinator: 重验目标、EmptyWorkingSet、反馈采样
+    Coordinator-->>Monitor: 结果和自适应反馈
+    Monitor->>Store: 保存每目标日志、冷却与评分
+  else 状态或候选不符合
+    Monitor->>Store: 保存安全跳过原因
+  end
+  Monitor-->>UI: 完成/跳过反馈并刷新日志列表
+```
+
+### 验证结果与限制
+
+- 新增测试覆盖回收日志对 API 成功/失败/执行前跳过的区分、驻留页回收与 Commit 不变提示、最多 128 条日志持久化，以及 schema 2 向 schema 3 兼容读取。
+- 最新验证：`dotnet build -c Release -m:1 -v:minimal` 成功，0 warning / 0 error；`dotnet test -c Release -m:1 -v:minimal` 成功，28/28 通过；`git diff --check` 成功，仅有 Git 对 LF/CRLF 转换的提示。
+- 以上只证明构建、XAML 编译和单元测试通过。尚未在真实 Windows 工作负载下测量可用内存增量、硬缺页、分页变化、卡顿和交互延迟，也没有在当前会话中人工验收实际窗口画面；因此不能据此宣称已改善系统卡顿。

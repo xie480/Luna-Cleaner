@@ -6,14 +6,16 @@ namespace MemGuardian.Next.Windows;
 /// <summary>Stores bounded local trend and feedback state under the current user's LocalAppData.</summary>
 public sealed class LocalRuntimeStore
 {
-    private const int SchemaVersion = 2;
+    private const int SchemaVersion = 3;
     private const int FeedbackHistoryLimit = 32;
+    private const int ReclaimLogLimit = 128;
     private const string RuntimeStateFileName = "state.json";
     private const string SettingsFileName = "settings.json";
     private const string RunLockFileName = "run.lock";
     private readonly JsonSerializerOptions _json = new() { PropertyNameCaseInsensitive = true, WriteIndented = true, MaxDepth = 24 };
     private readonly List<string> _warnings = new();
     private readonly List<ReclaimFeedback> _feedbackHistory = new();
+    private readonly List<ReclaimLogEntry> _reclaimLogHistory = new();
     private readonly object _feedbackSync = new();
 
     /// <summary>Creates the user data directory, loads validated settings and restores bounded history.</summary>
@@ -51,6 +53,12 @@ public sealed class LocalRuntimeStore
         get { lock (_feedbackSync) return _feedbackHistory.ToArray(); }
     }
 
+    /// <summary>Returns the latest bounded set of manual and automatic reclaim audit entries.</summary>
+    public IReadOnlyList<ReclaimLogEntry> RecentReclaimLogs
+    {
+        get { lock (_feedbackSync) return _reclaimLogHistory.ToArray(); }
+    }
+
     /// <summary>Appends one measured recovery result while keeping the persisted audit ring bounded.</summary>
     public void RecordFeedback(ReclaimFeedback feedback)
     {
@@ -59,6 +67,17 @@ public sealed class LocalRuntimeStore
         {
             if (_feedbackHistory.Count == FeedbackHistoryLimit) _feedbackHistory.RemoveAt(0);
             _feedbackHistory.Add(feedback);
+        }
+    }
+
+    /// <summary>Appends an audit event and retains only the most recent 128 records.</summary>
+    public void RecordReclaimLog(ReclaimLogEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        lock (_feedbackSync)
+        {
+            if (_reclaimLogHistory.Count == ReclaimLogLimit) _reclaimLogHistory.RemoveAt(0);
+            _reclaimLogHistory.Add(entry);
         }
     }
 
@@ -128,7 +147,7 @@ public sealed class LocalRuntimeStore
         try
         {
             WriteJsonAtomic(Path.Combine(DirectoryPath, SettingsFileName), Options);
-            var data = new RuntimeStateFile(SchemaVersion, State, History.Snapshot(), RecentFeedbacks);
+            var data = new RuntimeStateFile(SchemaVersion, State, History.Snapshot(), RecentFeedbacks, RecentReclaimLogs);
             WriteJsonAtomic(Path.Combine(DirectoryPath, RuntimeStateFileName), data);
             return null;
         }
@@ -231,12 +250,16 @@ public sealed class LocalRuntimeStore
         {
             if (new FileInfo(path).Length > 64 * 1024 * 1024) throw new JsonException("State file exceeds the size limit.");
             var data = JsonSerializer.Deserialize<RuntimeStateFile>(File.ReadAllText(path), _json);
-            if (data is null || data.Version is not (1 or SchemaVersion)) throw new JsonException("Unsupported state schema.");
+            if (data is null || data.Version is not (1 or 2 or SchemaVersion)) throw new JsonException("Unsupported state schema.");
             var now = DateTimeOffset.UtcNow;
             History.Restore(data.History ?? Array.Empty<HistoryEntry>(), now);
             lock (_feedbackSync)
+            {
                 _feedbackHistory.AddRange((data.FeedbackHistory ?? Array.Empty<ReclaimFeedback>())
                     .Where(item => item is not null).TakeLast(FeedbackHistoryLimit));
+                _reclaimLogHistory.AddRange((data.ReclaimLogHistory ?? Array.Empty<ReclaimLogEntry>())
+                    .Where(item => item is not null).TakeLast(ReclaimLogLimit));
+            }
             var state = data.State ?? new ReclaimState();
             return state with
             {
@@ -281,5 +304,6 @@ public sealed class LocalRuntimeStore
     }
 
     private sealed record RuntimeStateFile(int Version, ReclaimState? State, IReadOnlyList<HistoryEntry>? History,
-        IReadOnlyList<ReclaimFeedback>? FeedbackHistory = null);
+        IReadOnlyList<ReclaimFeedback>? FeedbackHistory = null,
+        IReadOnlyList<ReclaimLogEntry>? ReclaimLogHistory = null);
 }

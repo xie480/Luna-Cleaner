@@ -182,7 +182,11 @@ public sealed record CandidateSelection(
 public sealed record CandidateRejection(ProcessIdentity Identity, string ProcessName, string Reason);
 
 /// <summary>一次安全回收尝试及其 native 错误。</summary>
-public sealed record ReclaimAttempt(ProcessIdentity Identity, string ProcessName, bool Succeeded, string? Error);
+public sealed record ReclaimAttempt(ProcessIdentity Identity, string ProcessName, bool Succeeded, string? Error)
+{
+    /// <summary>True only when EmptyWorkingSet was actually invoked for this process.</summary>
+    public bool NativeCallAttempted { get; init; }
+}
 
 /// <summary>回收前后测量和策略反馈结果。</summary>
 public sealed record ReclaimFeedback(

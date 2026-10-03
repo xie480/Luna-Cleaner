@@ -23,6 +23,9 @@ namespace MemGuardian.Next.Desktop;
 public sealed record ProcessRow(string Initial, string ProcessName, string Details, string Cpu,
     string Io, string WorkingSet, string PrivateCommit, string Threads, string Handles, string Activity, MediaBrush ActivityBrush);
 
+public sealed record ReclaimLogRow(string Target, string Timestamp, string Trigger, string WorkingSetReclaimed,
+    string AvailableDelta, string CommitDelta, string Status, string Summary, MediaBrush StatusBrush);
+
 [SupportedOSPlatform("windows")]
 public partial class MainWindow : Window
 {
@@ -40,10 +43,12 @@ public partial class MainWindow : Window
     private WpfButton? _refreshButton;
     private object? _refreshButtonOriginalContent;
     private bool _refreshPending;
+    private bool _manualCleanupBusy;
     private bool _explicitExit;
     private bool _awaitingShutdown;
 
     public ObservableCollection<ProcessRow> ProcessRows { get; } = new();
+    public ObservableCollection<ReclaimLogRow> ReclaimLogRows { get; } = new();
 
     public MainWindow(bool backgroundLaunch)
     {
@@ -57,6 +62,7 @@ public partial class MainWindow : Window
         DataContext = this;
         LoadSettingsIntoControls();
         UpdateFeedbackText();
+        UpdateReclaimLogRows();
 
         _trayDrawingIcon = CreateTrayIcon();
         _trayIcon = new Forms.NotifyIcon
@@ -126,6 +132,7 @@ public partial class MainWindow : Window
     private void ProcessesNavClick(object sender, RoutedEventArgs e) => ShowPage("processes");
     private void DiagnosticsNavClick(object sender, RoutedEventArgs e) => ShowPage("diagnostics");
     private void SettingsNavClick(object sender, RoutedEventArgs e) => ShowPage("settings");
+    private void ReclaimLogNavClick(object sender, RoutedEventArgs e) => ShowPage("reclaim-log");
 
     private void ShowPage(string page)
     {
@@ -133,10 +140,12 @@ public partial class MainWindow : Window
         ProcessesPage.Visibility = page == "processes" ? Visibility.Visible : Visibility.Collapsed;
         DiagnosticsPage.Visibility = page == "diagnostics" ? Visibility.Visible : Visibility.Collapsed;
         SettingsPage.Visibility = page == "settings" ? Visibility.Visible : Visibility.Collapsed;
+        ReclaimLogPage.Visibility = page == "reclaim-log" ? Visibility.Visible : Visibility.Collapsed;
         SetNavigationVisual(DashboardNav, page == "dashboard");
         SetNavigationVisual(ProcessesNav, page == "processes");
         SetNavigationVisual(DiagnosticsNav, page == "diagnostics");
         SetNavigationVisual(SettingsNav, page == "settings");
+        SetNavigationVisual(ReclaimLogNav, page == "reclaim-log");
         if (page == "settings") LoadSettingsIntoControls();
     }
 
@@ -205,6 +214,49 @@ public partial class MainWindow : Window
 
     private void RefreshTimeoutTick(object? sender, EventArgs e) =>
         CompleteRefreshFeedback("等待系统采样响应超时；监控仍会按计划继续运行。");
+
+    private async void ManualCleanupClick(object sender, RoutedEventArgs e)
+    {
+        if (_manualCleanupBusy) return;
+        var monitor = _monitor;
+        if (monitor is null)
+        {
+            ShowToast("请先在‘策略与启动’中启用监控，再发起手动清理。");
+            return;
+        }
+
+        _manualCleanupBusy = true;
+        var buttons = new[] { DashboardManualCleanupButton, ProcessesManualCleanupButton };
+        var originalContents = buttons.Select(button => button.Content).ToArray();
+        foreach (var button in buttons)
+        {
+            button.IsEnabled = false;
+            button.Content = "安全检查中…";
+        }
+
+        try
+        {
+            await Task.Yield();
+            var result = await monitor.RequestManualReclaimAsync();
+            UpdateReclaimLogRows();
+            UpdateFeedbackText();
+            ShowToast(result, TimeSpan.FromSeconds(8));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or
+                                           InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            ShowToast($"手动清理请求未完成：{exception.Message}");
+        }
+        finally
+        {
+            for (var index = 0; index < buttons.Length; index++)
+            {
+                buttons[index].Content = originalContents[index];
+                buttons[index].IsEnabled = true;
+            }
+            _manualCleanupBusy = false;
+        }
+    }
 
     private void MinimizeClick(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
 
@@ -475,6 +527,7 @@ public partial class MainWindow : Window
         NoEvidenceText.Visibility = update.Diagnosis.Evidence.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         AutoPolicyText.Text = CandidateSummary(update);
         UpdateFeedbackText();
+        UpdateReclaimLogRows();
 
         var history = _store.History.Snapshot().Where(item => item.CapturedAt >= update.UpdatedAt - TimeSpan.FromMinutes(15)).ToArray();
         AvailableTrend.Values = DashboardAvailableTrend.Values = history.Select(item => item.TotalPhysicalBytes == 0 ? 0 : (double)item.AvailablePhysicalBytes / item.TotalPhysicalBytes).ToArray();
@@ -536,10 +589,55 @@ public partial class MainWindow : Window
 
     private void UpdateFeedbackText()
     {
+        var entry = _store.RecentReclaimLogs.LastOrDefault();
+        if (entry is not null)
+        {
+            var trigger = entry.Trigger == ReclaimTrigger.Manual ? "手动" : "自动";
+            LastFeedbackText.Text = $"{entry.CapturedAt.ToLocalTime():MM-dd HH:mm:ss} · {trigger} · {entry.TargetProcessName ?? "系统请求"} · {entry.Summary}";
+            return;
+        }
+
         var feedback = _store.RecentFeedbacks.LastOrDefault();
         LastFeedbackText.Text = feedback is null
             ? "尚无回收记录；自动回收默认关闭。"
             : $"{feedback.CapturedAt.ToLocalTime():MM-dd HH:mm:ss} · {feedback.TargetProcessName ?? "目标进程"} · {feedback.Summary}";
+    }
+
+    private void UpdateReclaimLogRows()
+    {
+        var entries = _store.RecentReclaimLogs;
+        ReclaimLogRows.Clear();
+        foreach (var entry in entries.Reverse())
+        {
+            var target = entry.TargetProcessName is { Length: > 0 } processName
+                ? $"{processName}{(entry.TargetIdentity is { } identity ? $" · PID {identity.ProcessId}" : string.Empty)}"
+                : "系统清理请求";
+            var trigger = entry.Trigger == ReclaimTrigger.Manual ? "手动" : "自动";
+            var status = entry.Status switch
+            {
+                ReclaimLogStatus.Succeeded => "API 成功",
+                ReclaimLogStatus.Failed => "失败",
+                _ => "已跳过"
+            };
+            var statusBrush = (MediaBrush)FindResource(entry.Status switch
+            {
+                ReclaimLogStatus.Succeeded => "Success",
+                ReclaimLogStatus.Failed => "Danger",
+                _ => "Warning"
+            });
+            ReclaimLogRows.Add(new ReclaimLogRow(target, entry.CapturedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.CurrentCulture),
+                trigger, Bytes(entry.WorkingSetReclaimedBytes), SignedBytes(entry.AvailableRamDeltaBytes),
+                SignedBytes(entry.CommitDeltaBytes), status, entry.Summary, statusBrush));
+        }
+        ReclaimLogCountText.Text = $"最近 {entries.Count} / 128 条";
+        ReclaimLogEmptyText.Visibility = entries.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private static string SignedBytes(long value)
+    {
+        if (value == 0) return "0 B";
+        var magnitude = value == long.MinValue ? (ulong)long.MaxValue + 1 : (ulong)Math.Abs(value);
+        return $"{(value > 0 ? "+" : "−")}{Bytes(magnitude)}";
     }
 
     private static string TranslateBlock(string reason) => reason switch
@@ -658,12 +756,12 @@ public partial class MainWindow : Window
         SidebarStateText.Text = fallback;
     }
 
-    private void ShowToast(string message)
+    private void ShowToast(string message, TimeSpan? duration = null)
     {
         ToastText.Text = message;
         ToastBorder.Visibility = Visibility.Visible;
         _toastTimer?.Stop();
-        _toastTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
+        _toastTimer = new DispatcherTimer { Interval = duration ?? TimeSpan.FromSeconds(4) };
         _toastTimer.Tick += (_, _) => { ToastBorder.Visibility = Visibility.Collapsed; _toastTimer.Stop(); };
         _toastTimer.Start();
     }

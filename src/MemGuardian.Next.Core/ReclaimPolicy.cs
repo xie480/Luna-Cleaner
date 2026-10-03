@@ -230,7 +230,10 @@ public sealed class AdaptiveReclaimCoordinator
             }
 
             var result = _reclaimer.TryTrim(target.Identity);
-            attempts.Add(new ReclaimAttempt(target.Identity, target.ProcessName, result.Succeeded, result.Error));
+            attempts.Add(new ReclaimAttempt(target.Identity, target.ProcessName, result.Succeeded, result.Error)
+            {
+                NativeCallAttempted = true
+            });
             if (!result.Succeeded) continue;
 
             // Once a native trim succeeds, finish its feedback sample even if the user cancels the monitor.

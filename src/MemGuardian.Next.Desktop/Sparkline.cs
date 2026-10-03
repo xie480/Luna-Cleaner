@@ -46,11 +46,12 @@ public sealed class Sparkline : FrameworkElement
         base.OnRender(drawingContext);
         var bounds = new Rect(0, 0, ActualWidth, ActualHeight);
         if (bounds.Width < 4 || bounds.Height < 4) return;
-        var gridPen = new MediaPen(new SolidColorBrush(MediaColor.FromRgb(235, 239, 245)), 1);
+        var gridBrush = new SolidColorBrush(MediaColor.FromRgb(49, 68, 88)) { Opacity = 0.42 };
+        var gridPen = new MediaPen(gridBrush, 1);
         gridPen.Freeze();
-        for (var line = 1; line <= 3; line++)
+        for (var line = 1; line <= 2; line++)
         {
-            var y = bounds.Height * line / 4;
+            var y = bounds.Height * line / 3;
             drawingContext.DrawLine(gridPen, new MediaPoint(0, y), new MediaPoint(bounds.Width, y));
         }
 
