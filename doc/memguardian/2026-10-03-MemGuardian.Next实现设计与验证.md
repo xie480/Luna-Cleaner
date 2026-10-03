@@ -2,13 +2,13 @@
 
 ## 1. 背景与目标
 
-从空工作区创建 Windows 10/11 x64、.NET 8 CLI。目标是区分物理驻留压力、系统 Commit 压力、实际分页活动和内核池增长；只在持续 Pressure/Critical 且有可靠闲置证据时，按上限回收进程 Working Set，并用回收后的可用 RAM、Commit 和 paging 结果调整策略。
+从空工作区创建 Windows 10/11 x64、.NET 8 内存诊断工具，现包含可视化 WPF 工作台和 CLI。目标是区分物理驻留压力、系统 Commit 压力、实际分页活动和内核池增长；只在持续 Pressure/Critical 且有可靠闲置证据时，按上限回收进程 Working Set，并用回收后的可用 RAM、Commit 和 paging 结果调整策略。
 
 成功不以“进程 Working Set 下降”单独判定。系统必须报告可用 RAM 与 Commit 的变化；若只有 resident pages 下降，明确说明没有证据表明 Commit 被释放。
 
 ## 2. 需求与约束
 
-- 目标框架为 .NET 8，Windows 10/11 x64；CLI 支持 `status`、两种 `top`、`diagnose`、`run`（含 `--dry-run`）和 `once`。
+- 目标框架为 .NET 8，Windows 10/11 x64；提供 WPF 桌面端和 CLI，CLI 支持 `status`、两种 `top`、`diagnose`、`run`（含 `--dry-run`）和 `once`。
 - 采集优先使用 `GlobalMemoryStatusEx`、`GetPerformanceInfo`、`PdhAddEnglishCounterW`、`GetProcessMemoryInfo`。进程 CPU/I/O 使用 documented process counters 的时间差；进程列表由 `Process.GetProcesses()` 获取，不用高频 WMI。
 - 首轮策略默认参数：状态采样和前台使用轮询 5 秒、进程采样 15 秒、趋势最长 60 分钟、最多 720 个系统样本；每个进程样本最多保存 512 个 Private Commit 观测；进入压力状态需持续时间确认并带退出迟滞。
 - 回收候选必须属于当前用户和当前 Session，后台且 Working Set 不低于 256 MiB，CPU 不高于 1%，I/O 不高于 64 KiB/s，并且最近前台使用时间已知且超过 10 分钟。最近 120 秒使用、前台进程、自身、denylist、身份或使用历史未知的进程不可回收。
@@ -34,8 +34,11 @@
 ```mermaid
 flowchart LR
   CLI[MemGuardian.Next.Cli\n命令解析与输出] --> Core[MemGuardian.Next.Core\n指标模型、诊断、状态机、策略]
-  Win[MemGuardian.Next.Windows\nWin32/PDH、进程采集、EmptyWorkingSet、本地状态] --> Core
+  UI[MemGuardian.Next.Desktop\nWPF 工作台] --> Service[GuardianMonitorService\n后台协调]
+  Service --> Win[MemGuardian.Next.Windows\nWin32/PDH、本地状态与回收]
+  Win --> Core
   CLI --> Win
+  UI --> Core
   Tests[MemGuardian.Next.Tests\n纯逻辑与策略测试] --> Core
 ```
 
@@ -48,6 +51,7 @@ flowchart LR
 | 小型手写 CLI 解析 | 零运行时包；命令数量固定，可逐项测试 | help、校验和错误提示需项目维护 | 采用；命令树很小且无需 shell completion |
 | `System.CommandLine` | 官方命令树、选项绑定与帮助能力；仓库持续发布 2.x | 新增包和 API 熟悉成本；当前命令规模收益有限 | 暂不采用；若命令扩张或需 completion 再评估 |
 | xUnit v2 / MSTest / NUnit | 均有成熟 .NET runner 与测试发现 | 都需测试 SDK/adapter；框架主版本带迁移面 | 选 xUnit v2 标准 VSTest 组合，避开近期 v4 的迁移面 |
+| WPF / WinUI 3 | WPF 可直接使用 .NET 8 和 ControlTemplate 自定义外观；WinUI 3 提供 Windows App SDK 现代控件 | WinUI 3 增加 Windows App SDK 与打包/运行时约束；WPF 自带 Windows-only 定位 | 选择 WPF，使用自定义模板、矢量图表和卡片布局，不使用默认 DataGrid / 原生默认按钮样式 |
 
 官方仓库显示 xUnit 持续发布 v3/v4，MSTest 与 NUnit 也持续维护，因此选择不是基于“唯一可用”，而是保留成熟 VSTest 工作流并将依赖限制在测试项目。[xUnit releases](https://github.com/xunit/xunit/releases) [MSTest/TestFX](https://github.com/microsoft/testfx) [NUnit](https://github.com/nunit/nunit)
 
@@ -95,7 +99,50 @@ Phase 2：仅在 Pressure/Critical、冷却已结束且候选满足全部限制�
 ## 9. 实施进度
 
 - 已确认工作区为空且不存在既有 `doc/`；当前建立本文。
-- 已实现 Core / Windows / CLI / Tests 四项目；首轮编译前复核修正了 `OpenProcessToken` 的 advapi32 导入，并新增 native trim 前的新鲜快照与前台状态复核。`once` / `diagnose` 也会记录轮询到的前台进程，以建立最近使用保护。
-- 临时安装 .NET SDK 8.0.425 后，Release build 通过（0 警告、0 错误）；Release 测试 19/19 通过，包含只读 Windows API smoke test，验证系统和当前进程计数器，不调用任何回收 API。
+- 初始版本已实现 Core / Windows / CLI / Tests 四项目；桌面端扩展为五项目。首轮编译前复核修正了 `OpenProcessToken` 的 advapi32 导入，并新增 native trim 前的新鲜快照与前台状态复核。`once` / `diagnose` 也会记录轮询到的前台进程，以建立最近使用保护。
+- 临时安装 .NET SDK 8.0.425 后，桌面端迭代的最终 Release build 通过（0 警告、0 错误）；最终 Release 测试 25/25 通过，包含只读 Windows API smoke test、旧状态兼容和回收反馈持久化测试，不调用任何真实回收 API。
 - `dotnet publish src\MemGuardian.Next.Cli -c Release -r win-x64 --self-contained false` 成功生成 `memguardian.exe`；直接启动 `memguardian.exe --help` 输出预期命令帮助。未调用会持久化本地趋势状态的 status/diagnose，也未运行会真实回收的 `once` 或 `run`。
 - 尚未在真实目标负载下测量卡顿、响应时间或回收效果；这部分需在 Windows 10/11 代表性工作负载上按性能验证方案执行。
+
+## 10. 可视化桌面端与常驻运行
+
+### 10.1 模块边界
+
+在核心诊断和 Windows provider 上新增 `MemGuardian.Next.Desktop`。WPF 界面只负责呈现指标、接收设置和控制后台服务；诊断、状态转换、候选筛选和回收反馈仍调用 Core 中既有实现。这样 GUI 不维护第二套诊断阈值或回收规则。
+
+```mermaid
+flowchart LR
+  UI[WPF 工作台\n状态卡片、趋势、进程、设置] --> Service[GuardianMonitorService\n低频采样、状态转换、结果反馈]
+  Service --> Core[Core\nDiagnosisEngine、MemoryStateMachine、候选和 Backoff]
+  Service --> Win[Windows provider\nGlobalMemoryStatusEx、GetPerformanceInfo、PDH、进程 API]
+  Service --> Reclaimer[EmptyWorkingSet\n只在 Pressure/Critical 且自动回收已开启时]
+  Service --> Store[LocalRuntimeStore\nring buffer、状态和冷却]
+  UI --> Startup[当前用户 Run 键\n可选开机启动]
+```
+
+桌面端使用 `WindowChrome` 自绘标题栏，应用级样式重定义按钮、文本输入框与开关模板；进程榜单由自定义 `ItemsControl` 行构成，不使用默认 `DataGrid`；趋势图是自绘 WPF `FrameworkElement`，不增加第三方图表依赖。仪表盘显示物理 Available、系统 Commit、paging、内核池/pagefile；进程页显示 PID、进程名、用户与 Session、前台/最近使用、CPU、I/O、Working Set、Private Commit、线程和句柄。
+
+### 10.2 配置与托盘
+
+- 桌面开关写入 `%LOCALAPPDATA%\MemGuardian.Next\desktop.json`，诊断参数仍与 CLI 共用 `settings.json` 和 `LocalRuntimeStore`。编辑后先经 `NormalizeOptions` 校验，再替换有界 ring buffer 并持久化。
+- 自动监控默认开启，自动回收默认关闭。关闭窗口仅在用户启用“后台运行”时转入托盘；托盘双击恢复，窗口“退出应用”会停止采样、保存状态并释放互斥锁。
+- 一键开机启动只操作当前用户 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\MemGuardian.Next` 项，不创建计划任务或服务，不申请管理员权限。启动命令含可执行文件绝对路径，用户可选登录后最小化到托盘。
+- 桌面监控和会写状态的 CLI 命令共用独占锁；进程采样默认 15 秒，系统样本默认 5 秒，避免高频全量进程轮询。趋势 ring buffer 固定容量，页面只显示最近 15 分钟。
+- 每次真实 trim 的回收前后 Available RAM、目标 Working Set、系统 Commit、Page Reads/sec、Pages Input/sec 和目标进程身份都会写入状态文件；只保留最近 32 条，旧版 state schema 1 可继续读取并在下一次保存时升级。
+
+### 10.3 安全策略与未验证项
+
+设置页开放 Available / Commit 压力阈值、采样频率、paging 告警、持续确认时间、空闲门槛、候选 Working Set / CPU / I/O 上限、冷却、反馈等待、泄漏增长阈值及 denylist。程序强制保留最近使用 120 秒、空闲时间至少 10 分钟、全局冷却至少 5 分钟、同进程冷却至少 15 分钟、候选 Working Set 至少 256 MiB、每轮最多两个进程等下限。
+
+显式开启自动回收后，后台服务仅在状态机确认 Pressure / Critical 时，将候选送入既有 `AdaptiveReclaimCoordinator`。native 调用前继续复核目标身份与前台状态；回收后观察 Available RAM、Working Set、Commit 和 paging。paging 明显恶化会停止本轮并进入 Backoff。`EmptyWorkingSet` 的效果界定为驻留页回收，不保证降低 Commit。
+
+已确认事实：Release 构建会编译 XAML 和自定义 WPF 控件；策略与配置由自动化测试覆盖。暂未验证：此运行环境没有目标用户的真实内存压力负载数据，也没有回收前后交互延迟/硬缺页测量；首次真实设备验证应先保持自动回收关闭、观察 dry-run 候选和 15 分钟趋势，再在可恢复的工作负载下小范围启用。
+
+## 11. 桌面端实施与验证结果
+
+- 新增 `MemGuardian.Next.Desktop` 并加入 solution；桌面状态/趋势/进程榜单/诊断证据与策略编辑共用 Core、Windows 采集和本地状态模型；CLI 仍保留给脚本使用。
+- 以 `DesktopPreferencesStore` 持久化托盘和开机项相关 UI 开关；`WindowsStartupRegistration` 仅写当前用户 Run 键；测试只覆盖纯命令行构造和临时目录 JSON，不触碰真实用户注册表。
+- `LocalRuntimeStore.UpdateOptions` 在强制边界校验后保留新窗口范围内的历史；自适应策略最小冷却与泄漏增长阈值另有单元测试。
+- 最终验证结果：`dotnet build -c Release` 成功、0 warning / 0 error；`dotnet test -c Release` 成功、25 项通过。测试覆盖原核心策略、桌面设置/启动命令、回收前后测量和有界持久化；测试不调用真实 `EmptyWorkingSet`，也不修改用户注册表。
+- 没有在开发机上启用自动回收、修改 Run 注册表项或宣称卡顿改善；目标设备 CPU、page reads、hard fault 和应用响应时间仍需按本节的负载对照方案测量。
+- Git 本地分模块提交已按 `英文类型: 中文描述` 格式记录。GitHub 账号查询到的同名 `LunaOpenLabs/Luna-Cleaner` 仓库当前权限为只读；不会将内容推到无写权限的仓库。需要用户提供其有写权限的远端地址，或开通该目标仓库写权限后再上传。
