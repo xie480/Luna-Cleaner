@@ -23,6 +23,82 @@
     <SolidColorBrush x:Key="Success" Color="#42E3A5" />
     <SolidColorBrush x:Key="Warning" Color="#FFB85E" />
     <SolidColorBrush x:Key="Danger" Color="#FF657D" />
+    <Style x:Key="ScrollbarPageButton" TargetType="{x:Type RepeatButton}">
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="IsTabStop" Value="False" />
+      <Setter Property="OverridesDefaultStyle" Value="True" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="{x:Type RepeatButton}">
+            <Border Background="Transparent" />
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style TargetType="{x:Type ScrollBar}">
+      <Setter Property="Width" Value="10" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="{x:Type ScrollBar}">
+            <Grid Background="Transparent" SnapsToDevicePixels="True">
+              <Border x:Name="ScrollbarRail" Margin="2" Background="#0C1826" CornerRadius="5" />
+              <Track x:Name="PART_Track" Orientation="{TemplateBinding Orientation}" IsDirectionReversed="True">
+                <Track.DecreaseRepeatButton>
+                  <RepeatButton x:Name="PART_DecreaseButton" Style="{StaticResource ScrollbarPageButton}" Command="{x:Static ScrollBar.PageUpCommand}" />
+                </Track.DecreaseRepeatButton>
+                <Track.Thumb>
+                  <Thumb x:Name="PART_Thumb" MinHeight="42" Margin="2,3">
+                    <Thumb.Template>
+                      <ControlTemplate TargetType="{x:Type Thumb}">
+                        <Border x:Name="ThumbSurface" Background="#344B63" BorderBrush="#405C76" BorderThickness="1" CornerRadius="4" />
+                        <ControlTemplate.Triggers>
+                          <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="ThumbSurface" Property="Background" Value="{StaticResource Accent}" />
+                            <Setter TargetName="ThumbSurface" Property="BorderBrush" Value="#71F2E4" />
+                          </Trigger>
+                          <Trigger Property="IsDragging" Value="True">
+                            <Setter TargetName="ThumbSurface" Property="Background" Value="{StaticResource AccentGradient}" />
+                            <Setter TargetName="ThumbSurface" Property="BorderBrush" Value="#80FFF1" />
+                          </Trigger>
+                        </ControlTemplate.Triggers>
+                      </ControlTemplate>
+                    </Thumb.Template>
+                  </Thumb>
+                </Track.Thumb>
+                <Track.IncreaseRepeatButton>
+                  <RepeatButton x:Name="PART_IncreaseButton" Style="{StaticResource ScrollbarPageButton}" Command="{x:Static ScrollBar.PageDownCommand}" />
+                </Track.IncreaseRepeatButton>
+              </Track>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="Orientation" Value="Horizontal">
+                <Setter Property="Width" Value="Auto" />
+                <Setter Property="Height" Value="10" />
+                <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="False" />
+                <Setter TargetName="PART_Thumb" Property="MinHeight" Value="0" />
+                <Setter TargetName="PART_Thumb" Property="MinWidth" Value="42" />
+                <Setter TargetName="PART_Thumb" Property="Margin" Value="3,2" />
+                <Setter TargetName="PART_DecreaseButton" Property="Command" Value="{x:Static ScrollBar.PageLeftCommand}" />
+                <Setter TargetName="PART_IncreaseButton" Property="Command" Value="{x:Static ScrollBar.PageRightCommand}" />
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="ScrollbarRail" Property="Background" Value="#14253A" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.45" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+      <Style.Triggers>
+        <Trigger Property="Orientation" Value="Horizontal">
+          <Setter Property="Width" Value="Auto" />
+          <Setter Property="Height" Value="10" />
+        </Trigger>
+      </Style.Triggers>
+    </Style>
     <Style TargetType="TextBlock">
       <Setter Property="FontFamily" Value="Segoe UI" />
       <Setter Property="Foreground" Value="{StaticResource Ink}" />

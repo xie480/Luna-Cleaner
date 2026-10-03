@@ -84,7 +84,7 @@
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                   <Button Style="{StaticResource SecondaryButton}" Content="立即采样" Click="RefreshClick" Margin="0,0,9,0" />
-                  <Button x:Name="DashboardManualCleanupButton" Style="{StaticResource PrimaryButton}" Content="立即清理" Click="ManualCleanupClick" Margin="0,0,9,0" />
+                  <Button x:Name="DashboardManualCleanupButton" Style="{StaticResource PrimaryButton}" Content="立即清理" ToolTip="手动操作允许历史未知的后台候选；仍需压力确认并通过其他安全检查。" Click="ManualCleanupClick" Margin="0,0,9,0" />
                   <Button Style="{StaticResource SecondaryButton}" Content="打开策略" Click="SettingsNavClick" />
                 </StackPanel>
               </Grid>
@@ -180,7 +180,7 @@
           </ScrollViewer>
           <ScrollViewer x:Name="ProcessesPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <StackPanel Margin="30,28,30,34">
-              <Grid Margin="0,0,0,20"><StackPanel><TextBlock Text="进程观察" FontSize="25" FontWeight="Bold"/><TextBlock Text="分别查看 Working Set 与 Private Commit；立即清理只处理压力已确认且通过保护检查的候选。" Style="{StaticResource BodyText}" Margin="0,5,0,0" /></StackPanel><Button x:Name="ProcessesManualCleanupButton" Style="{StaticResource PrimaryButton}" Content="立即清理" HorizontalAlignment="Right" VerticalAlignment="Center" Click="ManualCleanupClick" /></Grid>
+              <Grid Margin="0,0,0,20"><StackPanel><TextBlock Text="进程观察" FontSize="25" FontWeight="Bold"/><TextBlock Text="分别查看 Working Set 与 Private Commit；手动清理放行历史未知的后台候选，但仍要求压力确认并通过其他保护检查。" Style="{StaticResource BodyText}" Margin="0,5,0,0" /></StackPanel><Button x:Name="ProcessesManualCleanupButton" Style="{StaticResource PrimaryButton}" Content="立即清理" ToolTip="手动操作允许历史未知的后台候选；仍需压力确认并通过其他安全检查。" HorizontalAlignment="Right" VerticalAlignment="Center" Click="ManualCleanupClick" /></Grid>
               <Border Background="{StaticResource Card}" CornerRadius="12" Padding="20" BorderBrush="{StaticResource Line}" BorderThickness="1">
                 <StackPanel>
                   <Grid Margin="0,0,0,12"><TextBlock x:Name="ProcessCountText" Text="系统进程快照" FontSize="15" FontWeight="SemiBold"/><TextBlock Text="每 15 秒刷新一次进程 CPU / I/O 速率" Style="{StaticResource BodyText}" HorizontalAlignment="Right" VerticalAlignment="Center"/></Grid>
