@@ -1,0 +1,152 @@
+<Application x:Class="MemGuardian.Next.Desktop.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ShutdownMode="OnMainWindowClose">
+  <Application.Resources>
+    <SolidColorBrush x:Key="Ink" Color="#182331" />
+    <SolidColorBrush x:Key="Muted" Color="#7C8998" />
+    <SolidColorBrush x:Key="Accent" Color="#3378F6" />
+    <SolidColorBrush x:Key="AccentSoft" Color="#EAF1FF" />
+    <SolidColorBrush x:Key="Canvas" Color="#F4F7FB" />
+    <SolidColorBrush x:Key="Card" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="Line" Color="#E8EDF3" />
+    <SolidColorBrush x:Key="Sidebar" Color="#172638" />
+    <SolidColorBrush x:Key="SidebarMuted" Color="#A8B6C6" />
+    <SolidColorBrush x:Key="Success" Color="#16A47A" />
+    <SolidColorBrush x:Key="Warning" Color="#E69B30" />
+    <SolidColorBrush x:Key="Danger" Color="#E45C68" />
+    <Style TargetType="TextBlock">
+      <Setter Property="FontFamily" Value="Segoe UI" />
+      <Setter Property="Foreground" Value="{StaticResource Ink}" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <Style x:Key="BodyText" TargetType="TextBlock">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Foreground" Value="{StaticResource Muted}" />
+    </Style>
+    <Style x:Key="PrimaryButton" TargetType="Button">
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="Background" Value="{StaticResource Accent}" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="18,10" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="ButtonBorder" Background="{TemplateBinding Background}" CornerRadius="9" Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ButtonBorder" Property="Opacity" Value="0.88" /></Trigger>
+              <Trigger Property="IsPressed" Value="True"><Setter TargetName="ButtonBorder" Property="Opacity" Value="0.72" /></Trigger>
+              <Trigger Property="IsEnabled" Value="False"><Setter TargetName="ButtonBorder" Property="Opacity" Value="0.45" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+      <Setter Property="Foreground" Value="#435166" />
+      <Setter Property="Background" Value="#EEF2F7" />
+    </Style>
+    <Style x:Key="WindowButton" TargetType="Button">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="#667486" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Width" Value="42" />
+      <Setter Property="Height" Value="36" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="ChromeButton" Background="{TemplateBinding Background}" CornerRadius="8">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ChromeButton" Property="Background" Value="#EDF2F7" /></Trigger>
+              <DataTrigger Binding="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Tag}" Value="Close">
+                <Setter TargetName="ChromeButton" Property="Background" Value="Transparent" />
+              </DataTrigger>
+              <MultiDataTrigger>
+                <MultiDataTrigger.Conditions>
+                  <Condition Binding="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=IsMouseOver}" Value="True" />
+                  <Condition Binding="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Tag}" Value="Close" />
+                </MultiDataTrigger.Conditions>
+                <Setter TargetName="ChromeButton" Property="Background" Value="#E55360" />
+                <Setter Property="Foreground" Value="White" />
+              </MultiDataTrigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="NavButton" TargetType="Button">
+      <Setter Property="Foreground" Value="{StaticResource SidebarMuted}" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="Padding" Value="14,12" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="NavBorder" Background="{TemplateBinding Background}" CornerRadius="9" Padding="{TemplateBinding Padding}">
+              <ContentPresenter VerticalAlignment="Center" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="NavBorder" Property="Background" Value="#22364B" /></Trigger>
+              <Trigger Property="IsPressed" Value="True"><Setter TargetName="NavBorder" Property="Background" Value="#2B4663" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="FieldBox" TargetType="TextBox">
+      <Setter Property="Foreground" Value="{StaticResource Ink}" />
+      <Setter Property="Background" Value="#F7F9FC" />
+      <Setter Property="BorderBrush" Value="#E4EAF1" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="11,9" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="TextBox">
+            <Border x:Name="InputBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8">
+              <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="InputBorder" Property="BorderBrush" Value="{StaticResource Accent}" /></Trigger>
+              <Trigger Property="IsEnabled" Value="False"><Setter TargetName="InputBorder" Property="Opacity" Value="0.5" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="CustomCheckBox" TargetType="CheckBox">
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="CheckBox">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+              <Border x:Name="CheckTrack" Width="42" Height="24" CornerRadius="12" Background="#D7DEE7" VerticalAlignment="Center">
+                <Ellipse x:Name="CheckThumb" Width="18" Height="18" Fill="White" HorizontalAlignment="Left" Margin="3" />
+              </Border>
+              <ContentPresenter Margin="11,0,0,0" VerticalAlignment="Center" />
+            </StackPanel>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="CheckTrack" Property="Background" Value="{StaticResource Accent}" />
+                <Setter TargetName="CheckThumb" Property="HorizontalAlignment" Value="Right" />
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="CheckTrack" Property="Opacity" Value="0.86" /></Trigger>
+              <Trigger Property="IsEnabled" Value="False"><Setter TargetName="CheckTrack" Property="Opacity" Value="0.45" /></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </Application.Resources>
+</Application>

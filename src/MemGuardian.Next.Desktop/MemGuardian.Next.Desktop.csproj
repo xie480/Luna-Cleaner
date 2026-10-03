@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <AssemblyName>MemGuardian.Next.Desktop</AssemblyName>
+    <RootNamespace>MemGuardian.Next.Desktop</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MemGuardian.Next.Core\MemGuardian.Next.Core.csproj" />
+    <ProjectReference Include="..\MemGuardian.Next.Windows\MemGuardian.Next.Windows.csproj" />
+  </ItemGroup>
+</Project>

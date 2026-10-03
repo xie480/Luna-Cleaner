@@ -8,6 +8,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MemGuardian.Next.Windows", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MemGuardian.Next.Cli", "src\MemGuardian.Next.Cli\MemGuardian.Next.Cli.csproj", "{6A972C6A-A4BF-4240-B811-31F89A73E4A3}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MemGuardian.Next.Desktop", "src\MemGuardian.Next.Desktop\MemGuardian.Next.Desktop.csproj", "{7C8D2AA4-04A6-4B34-BA7F-8EAB84643299}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MemGuardian.Next.Tests", "tests\MemGuardian.Next.Tests\MemGuardian.Next.Tests.csproj", "{795E99C8-FB7C-440D-9A25-8D21B2554C6A}"
 EndProject
 Global
@@ -28,6 +30,10 @@ Global
 		{6A972C6A-A4BF-4240-B811-31F89A73E4A3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6A972C6A-A4BF-4240-B811-31F89A73E4A3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6A972C6A-A4BF-4240-B811-31F89A73E4A3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7C8D2AA4-04A6-4B34-BA7F-8EAB84643299}.Debug|Any CPU.ActiveCfg = Release|Any CPU
+		{7C8D2AA4-04A6-4B34-BA7F-8EAB84643299}.Debug|Any CPU.Build.0 = Release|Any CPU
+		{7C8D2AA4-04A6-4B34-BA7F-8EAB84643299}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7C8D2AA4-04A6-4B34-BA7F-8EAB84643299}.Release|Any CPU.Build.0 = Release|Any CPU
 		{795E99C8-FB7C-440D-9A25-8D21B2554C6A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{795E99C8-FB7C-440D-9A25-8D21B2554C6A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{795E99C8-FB7C-440D-9A25-8D21B2554C6A}.Release|Any CPU.ActiveCfg = Release|Any CPU
