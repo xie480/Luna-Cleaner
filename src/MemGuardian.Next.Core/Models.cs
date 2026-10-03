@@ -200,7 +200,18 @@ public sealed record ReclaimFeedback(
     TimeSpan SuggestedCooldown,
     double StrategyScoreDelta,
     bool TargetsObserved,
-    string Summary);
+    string Summary)
+{
+    public DateTimeOffset CapturedAt { get; init; }
+    public ProcessIdentity? TargetIdentity { get; init; }
+    public string? TargetProcessName { get; init; }
+    public ulong AvailableRamBeforeBytes { get; init; }
+    public ulong AvailableRamAfterBytes { get; init; }
+    public ulong SystemCommitBeforeBytes { get; init; }
+    public ulong SystemCommitAfterBytes { get; init; }
+    public ulong TargetWorkingSetBeforeBytes { get; init; }
+    public ulong TargetWorkingSetAfterBytes { get; init; }
+}
 
 /// <summary>一次 dry-run 或执行后的完整回收轮次结果。</summary>
 public sealed record ReclaimRoundResult(

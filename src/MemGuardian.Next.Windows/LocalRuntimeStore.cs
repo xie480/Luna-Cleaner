@@ -6,17 +6,22 @@ namespace MemGuardian.Next.Windows;
 /// <summary>Stores bounded local trend and feedback state under the current user's LocalAppData.</summary>
 public sealed class LocalRuntimeStore
 {
-    private const int SchemaVersion = 1;
+    private const int SchemaVersion = 2;
+    private const int FeedbackHistoryLimit = 32;
     private const string RuntimeStateFileName = "state.json";
     private const string SettingsFileName = "settings.json";
     private const string RunLockFileName = "run.lock";
     private readonly JsonSerializerOptions _json = new() { PropertyNameCaseInsensitive = true, WriteIndented = true, MaxDepth = 24 };
     private readonly List<string> _warnings = new();
+    private readonly List<ReclaimFeedback> _feedbackHistory = new();
+    private readonly object _feedbackSync = new();
 
     /// <summary>Creates the user data directory, loads validated settings and restores bounded history.</summary>
-    public LocalRuntimeStore()
+    public LocalRuntimeStore(string? localAppDataOverride = null)
     {
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var localAppData = string.IsNullOrWhiteSpace(localAppDataOverride)
+            ? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
+            : localAppDataOverride;
         if (string.IsNullOrWhiteSpace(localAppData)) throw new InvalidOperationException("LocalAppData is unavailable.");
         DirectoryPath = Path.Combine(localAppData, "MemGuardian.Next");
         Directory.CreateDirectory(DirectoryPath);
@@ -29,16 +34,33 @@ public sealed class LocalRuntimeStore
     public string DirectoryPath { get; }
 
     /// <summary>Validated options loaded from settings.json or conservative built-in defaults.</summary>
-    public GuardianOptions Options { get; }
+    public GuardianOptions Options { get; private set; }
 
     /// <summary>In-memory recent trend ring restored from state.json.</summary>
-    public SystemHistoryBuffer History { get; }
+    public SystemHistoryBuffer History { get; private set; }
 
     /// <summary>Cooldowns and adaptive feedback state.</summary>
     public ReclaimState State { get; private set; } = new();
 
     /// <summary>Non-fatal read/write issues suitable for console diagnostics.</summary>
     public IReadOnlyList<string> Warnings => _warnings;
+
+    /// <summary>Returns the latest bounded set of structured before/after recovery measurements.</summary>
+    public IReadOnlyList<ReclaimFeedback> RecentFeedbacks
+    {
+        get { lock (_feedbackSync) return _feedbackHistory.ToArray(); }
+    }
+
+    /// <summary>Appends one measured recovery result while keeping the persisted audit ring bounded.</summary>
+    public void RecordFeedback(ReclaimFeedback feedback)
+    {
+        ArgumentNullException.ThrowIfNull(feedback);
+        lock (_feedbackSync)
+        {
+            if (_feedbackHistory.Count == FeedbackHistoryLimit) _feedbackHistory.RemoveAt(0);
+            _feedbackHistory.Add(feedback);
+        }
+    }
 
     /// <summary>Acquires an exclusive process lock; null means another mutating command is running.</summary>
     public FileStream? TryAcquireRunLock()
@@ -89,13 +111,24 @@ public sealed class LocalRuntimeStore
         };
     }
 
+    /// <summary>Applies validated user options while retaining only history within the new bounds.</summary>
+    public void UpdateOptions(GuardianOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var normalized = NormalizeOptions(options);
+        var previousHistory = History.Snapshot();
+        Options = normalized;
+        History = new SystemHistoryBuffer(normalized.HistoryCapacity, normalized.HistoryWindow);
+        History.Restore(previousHistory, DateTimeOffset.UtcNow);
+    }
+
     /// <summary>Atomically persists options, cooldowns and the bounded history buffer.</summary>
     public string? Save()
     {
         try
         {
             WriteJsonAtomic(Path.Combine(DirectoryPath, SettingsFileName), Options);
-            var data = new RuntimeStateFile(SchemaVersion, State, History.Snapshot());
+            var data = new RuntimeStateFile(SchemaVersion, State, History.Snapshot(), RecentFeedbacks);
             WriteJsonAtomic(Path.Combine(DirectoryPath, RuntimeStateFileName), data);
             return null;
         }
@@ -115,6 +148,19 @@ public sealed class LocalRuntimeStore
         {
             var parsed = JsonSerializer.Deserialize<GuardianOptions>(File.ReadAllText(path), _json);
             if (parsed is null) throw new JsonException("Settings file is empty.");
+            return NormalizeOptions(parsed);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or NotSupportedException)
+        {
+            _warnings.Add($"Settings could not be read; safe defaults are active: {exception.Message}");
+            return new GuardianOptions();
+        }
+    }
+
+    /// <summary>Validates an options record against conservative floors before applying or persisting it.</summary>
+    public static GuardianOptions NormalizeOptions(GuardianOptions parsed)
+    {
+            ArgumentNullException.ThrowIfNull(parsed);
             var defaults = new GuardianOptions();
             var historyWindow = Clamp(parsed.HistoryWindow, TimeSpan.FromMinutes(15), defaults.HistoryWindow);
             var systemInterval = Clamp(parsed.SystemSampleInterval, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30));
@@ -154,6 +200,8 @@ public sealed class LocalRuntimeStore
                 PageReadsCriticalPerSecond = Math.Max(parsed.PageReadsCriticalPerSecond, Math.Clamp(parsed.PageReadsAlertPerSecond, 1, 100)),
                 PagingRateIncreaseFactor = Math.Clamp(parsed.PagingRateIncreaseFactor, 1.25, 3),
                 PagingRateMinimumIncrease = Math.Clamp(parsed.PagingRateMinimumIncrease, 5, 500),
+                ProcessLeakGrowthBytes = Math.Max(parsed.ProcessLeakGrowthBytes, 32UL * 1024 * 1024),
+                DriverLeakGrowthBytes = Math.Max(parsed.DriverLeakGrowthBytes, 16UL * 1024 * 1024),
                 RecentUseProtection = Max(parsed.RecentUseProtection, TimeSpan.FromSeconds(120)),
                 MinimumIdleTime = Max(parsed.MinimumIdleTime, defaults.MinimumIdleTime),
                 MinimumCandidateWorkingSetBytes = Math.Max(parsed.MinimumCandidateWorkingSetBytes, defaults.MinimumCandidateWorkingSetBytes),
@@ -173,12 +221,6 @@ public sealed class LocalRuntimeStore
                 FeedbackDelay = Clamp(parsed.FeedbackDelay, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(30)),
                 Denylist = MergeDenylist(defaults.Denylist, parsed.Denylist)
             };
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or NotSupportedException)
-        {
-            _warnings.Add($"Settings could not be read; safe defaults are active: {exception.Message}");
-            return new GuardianOptions();
-        }
     }
 
     private ReclaimState LoadRuntimeState()
@@ -189,9 +231,12 @@ public sealed class LocalRuntimeStore
         {
             if (new FileInfo(path).Length > 64 * 1024 * 1024) throw new JsonException("State file exceeds the size limit.");
             var data = JsonSerializer.Deserialize<RuntimeStateFile>(File.ReadAllText(path), _json);
-            if (data is null || data.Version != SchemaVersion) throw new JsonException("Unsupported state schema.");
+            if (data is null || data.Version is not (1 or SchemaVersion)) throw new JsonException("Unsupported state schema.");
             var now = DateTimeOffset.UtcNow;
             History.Restore(data.History ?? Array.Empty<HistoryEntry>(), now);
+            lock (_feedbackSync)
+                _feedbackHistory.AddRange((data.FeedbackHistory ?? Array.Empty<ReclaimFeedback>())
+                    .Where(item => item is not null).TakeLast(FeedbackHistoryLimit));
             var state = data.State ?? new ReclaimState();
             return state with
             {
@@ -235,5 +280,6 @@ public sealed class LocalRuntimeStore
         return merged;
     }
 
-    private sealed record RuntimeStateFile(int Version, ReclaimState? State, IReadOnlyList<HistoryEntry>? History);
+    private sealed record RuntimeStateFile(int Version, ReclaimState? State, IReadOnlyList<HistoryEntry>? History,
+        IReadOnlyList<ReclaimFeedback>? FeedbackHistory = null);
 }

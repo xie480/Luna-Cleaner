@@ -189,6 +189,14 @@ public sealed class PolicyTests
         Assert.True(result.ResidentPagesOnly);
         Assert.Contains("Resident pages", result.Summary);
         Assert.Equal(0, result.CommitDeltaBytes);
+        Assert.Equal(before.AvailablePhysicalBytes, result.AvailableRamBeforeBytes);
+        Assert.Equal(after.AvailablePhysicalBytes, result.AvailableRamAfterBytes);
+        Assert.Equal(before.CommittedBytes, result.SystemCommitBeforeBytes);
+        Assert.Equal(after.CommittedBytes, result.SystemCommitAfterBytes);
+        Assert.Equal(800UL * MiB, result.TargetWorkingSetBeforeBytes);
+        Assert.Equal(100UL * MiB, result.TargetWorkingSetAfterBytes);
+        Assert.Contains("Page Reads/sec 1.0 -> 1.0", result.Summary);
+        Assert.Contains("Pages Input/sec 2.0 -> 2.0", result.Summary);
     }
 
     private static ProcessSnapshot Candidate(int pid, DateTimeOffset now, bool foreground = false,

@@ -90,15 +90,25 @@ public sealed class ReclaimFeedbackEvaluator
         var scoreDelta = pagingWorse ? -0.5 : negative ? -0.25 : availableDelta >= (long)options.MinimumAvailableIncreaseBytes ? 0.1 : 0;
         var cooldown = pagingWorse ? options.BackoffMaximum : negative ? options.BackoffInitial : options.GlobalCooldown;
         var summary = residentOnly
-            ? $"Resident pages reclaimed {FormatBytes(reclaimed)}; system Commit changed {FormatSignedBytes(commitDelta)}."
-            : $"Working Set reclaimed {FormatBytes(reclaimed)}; Available RAM changed {FormatSignedBytes(availableDelta)}; Commit changed {FormatSignedBytes(commitDelta)}.";
+            ? $"Resident pages reclaimed {FormatBytes(reclaimed)} (Working Set {FormatBytes(workingSetBefore)} -> {FormatBytes(workingSetAfter)}); Available RAM {FormatBytes(before.AvailablePhysicalBytes)} -> {FormatBytes(after.AvailablePhysicalBytes)}; Commit {FormatBytes(before.CommittedBytes)} -> {FormatBytes(after.CommittedBytes)}."
+            : $"Working Set {FormatBytes(workingSetBefore)} -> {FormatBytes(workingSetAfter)}; Available RAM {FormatBytes(before.AvailablePhysicalBytes)} -> {FormatBytes(after.AvailablePhysicalBytes)}; Commit {FormatBytes(before.CommittedBytes)} -> {FormatBytes(after.CommittedBytes)}.";
+        summary += $" Page Reads/sec {FormatRate(before.PageReadsPerSecond)} -> {FormatRate(after.PageReadsPerSecond)}; Pages Input/sec {FormatRate(before.PagesInputPerSecond)} -> {FormatRate(after.PagesInputPerSecond)}.";
         if (!targetsObserved) summary += " One or more target processes could not be observed after trim; outcome is unverified.";
         if (!pagingObserved) summary += " Paging counters were unavailable; outcome is unverified.";
         if (pagingWorse) summary += " Paging increased; entering Backoff.";
         else if (negative) summary += " Available RAM did not increase meaningfully; extending cooldown.";
         return new ReclaimFeedback(reclaimed, availableDelta, commitDelta, before.PageReadsPerSecond,
             after.PageReadsPerSecond, before.PagesInputPerSecond, after.PagesInputPerSecond, pagingObserved, pagingWorse,
-            residentOnly, negative, cooldown, scoreDelta, targetsObserved, summary);
+            residentOnly, negative, cooldown, scoreDelta, targetsObserved, summary)
+        {
+            CapturedAt = after.CapturedAt,
+            AvailableRamBeforeBytes = before.AvailablePhysicalBytes,
+            AvailableRamAfterBytes = after.AvailablePhysicalBytes,
+            SystemCommitBeforeBytes = before.CommittedBytes,
+            SystemCommitAfterBytes = after.CommittedBytes,
+            TargetWorkingSetBeforeBytes = workingSetBefore,
+            TargetWorkingSetAfterBytes = workingSetAfter
+        };
     }
 
     private static bool IsRateWorse(double? before, double? after, GuardianOptions options)
@@ -112,7 +122,7 @@ public sealed class ReclaimFeedbackEvaluator
         after >= before ? (long)Math.Min(after - before, (ulong)long.MaxValue) : -(long)Math.Min(before - after, (ulong)long.MaxValue);
 
     private static string FormatBytes(ulong bytes) => $"{bytes / 1024d / 1024d:F1} MiB";
-    private static string FormatSignedBytes(long bytes) => $"{bytes / 1024d / 1024d:+0.0;-0.0;0.0} MiB";
+    private static string FormatRate(double? value) => value is { } rate ? $"{rate:F1}" : "unavailable";
 }
 
 /// <summary>Persists per-process cooldowns and adaptive score/backoff after a completed round.</summary>
@@ -228,7 +238,11 @@ public sealed class AdaptiveReclaimCoordinator
             var after = await _snapshotProvider.CaptureAsync(true, CancellationToken.None).ConfigureAwait(false);
             var observedTarget = after.Processes.FirstOrDefault(process => process.Identity == target.Identity);
             var feedback = _feedbackEvaluator.Evaluate(currentSnapshot.Memory, after.Memory, currentTarget.WorkingSetBytes,
-                observedTarget?.WorkingSetBytes ?? 0, options, observedTarget is not null);
+                observedTarget?.WorkingSetBytes ?? 0, options, observedTarget is not null) with
+            {
+                TargetIdentity = target.Identity,
+                TargetProcessName = target.ProcessName
+            };
             feedbacks.Add(feedback);
             var processCooldowns = new Dictionary<string, DateTimeOffset>(currentState.ProcessCooldowns, StringComparer.Ordinal)
             {

@@ -256,6 +256,7 @@ internal sealed class GuardianApplication
         var result = await coordinator.ExecuteAsync(snapshot, selection, state, reclaimState, false,
             store.Options, cancellationToken).ConfigureAwait(false);
         ConsolePresenter.PrintRound(result);
+        foreach (var feedback in result.Feedbacks) store.RecordFeedback(feedback);
         store.UpdateState(AdaptiveReclaimStateUpdater.ApplyRound(store.State, result, store.Options,
             snapshot.Memory.CapturedAt), snapshot.Memory.CapturedAt);
         PrintSaveWarning(store.Save());
